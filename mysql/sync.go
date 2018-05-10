@@ -8,42 +8,66 @@ import (
 	"fmt"
 	"crypto/sha1"
 	"encoding/binary"
+	"sync"
 )
 
 type MysqlConnection struct{
 	conn net.Conn
+	user string
+	pwd string
+	msgSeq byte
+	host string
+	port int
+	seqLock sync.RWMutex
 }
 
-var msgseq byte = 0x00
 
-func ConnectMysql(host string, port int, user string, pwd string){
-	conn, err := net.Dial("tcp",host+":"+common.IntToStr(port))
+func GetMysqlConnection(host string, port int, user string, pwd string)(*MysqlConnection){
+	myConn := MysqlConnection{host:host,user:user,pwd:pwd,port:port}
+	// 连接mysql
+	myConn.ConnectMysql()
+	return &myConn
+}
+
+func (this *MysqlConnection)ConnectMysql(){
+	conn, err := net.Dial("tcp",this.host+":"+common.IntToStr(this.port))
 	if err != nil{
 		panic(errors.New(err.Error()))
 	}
+	this.conn = conn
+	var clientPacket = this.GetWriteAuthShackPacket()
+	this.WriteServerData(clientPacket)
+	bs := this.ReadServerData()
+	fmt.Println(bs)
+}
+func (this *MysqlConnection)ReadServerData()([]byte){
 	bs := make([]byte,1024)
-	n,err := conn.Read(bs)
+	n,err := this.conn.Read(bs)
 	if err != nil{
 		panic(errors.New(err.Error()))
 	}
 	bs=bs[:n]
-
-	var clientPacket = GetWriteAuthShackPacket(bs,user,pwd)
-	fmt.Println(clientPacket)
-	conn.Write(clientPacket)
-	_,err = conn.Read(bs)
-	if err != nil{
-		panic(errors.New(err.Error()))
-	}
-	fmt.Println(common.BytesToStr(bs))
-	conn.Close()
+	this.SetMsgSeq(bs[3])
+	return bs
 }
 
-func ParseInitShackPacket(data []byte) ProtocolPacket{
+func (this *MysqlConnection)WriteServerData(data []byte) error{
+	length := len(data) - 4
+	data[0] = byte(length)
+	data[1] = byte(length >> 8)
+	data[2] = byte(length >> 16)
+	data[3] = this.AddAndGetMsgSeq()
+	_,error := this.conn.Write(data)
+	return error
+}
+
+// 解析服务端
+func (this *MysqlConnection)ParseInitShackPacket(initPacketContent []byte) ProtocolPacket{
+	data := initPacketContent
 	packet := ProtocolPacket{}
 	packet.PacketLen = common.BytesToIntWithMin(data[:3])
 	packet.PacketNum = data[3]
-	msgseq = data[3]
+	this.msgSeq = data[3]
 	handleShackServerPacket := ServerShackPacket{}
 	handleShackServerPacket.ProtocolVersionNum = data[4]
 	pos := bytes.IndexByte(data[5:],0x00)+5
@@ -71,8 +95,10 @@ func ParseInitShackPacket(data []byte) ProtocolPacket{
 	return packet
 }
 
-func GetWriteAuthShackPacket(serverPacketBytes []byte,user string, pwd string) []byte{
-	protocolPacket := ParseInitShackPacket(serverPacketBytes)
+// 客户端解析握手
+func (this *MysqlConnection)GetWriteAuthShackPacket() []byte{
+	serverData := this.ReadServerData()
+	protocolPacket := this.ParseInitShackPacket(serverData)
 	packet := protocolPacket.Packet
 	var shackServerPacket = packet.(ServerShackPacket)
 	fmt.Println(uint32(binary.LittleEndian.Uint16(shackServerPacket.PowerFlagLow)))
@@ -91,11 +117,11 @@ func GetWriteAuthShackPacket(serverPacketBytes []byte,user string, pwd string) [
 	challengeRandNum := shackServerPacket.ChallengeRandNum
 	challengeRandNum = append(challengeRandNum, shackServerPacket.ChallengeRandNum2...)
 
-	scrambleBuff := scramblePassword(challengeRandNum,common.StrToBytes(pwd))
+	scrambleBuff := scramblePassword(challengeRandNum,common.StrToBytes(this.pwd))
 	// 报文头4+权能4+最大信息长度4+字符编码1+填充值23+用户名n+挑战认证数据n+【数据库n】
-	pktLen := 4 + 4 + 4 + 1 + 23 + len(user) + 1 + 1 + len(scrambleBuff) + 21 + 1
+	pktLen := 4 + 4 + 4 + 1 + 23 + len(this.user) + 1 + 1 + len(scrambleBuff) + 21 + 1
 	var data = make([]byte,pktLen)
-	copy(data,serverPacketBytes[:pktLen])
+	copy(data,serverData[:pktLen])
 	data[4] = byte(powerFlag)
 	data[5] = byte(powerFlag >> 8)
 	data[6] = byte(powerFlag >> 16)
@@ -109,23 +135,18 @@ func GetWriteAuthShackPacket(serverPacketBytes []byte,user string, pwd string) [
 	for ; pos < 13+23; pos++{
 		data[pos] = 0x00
 	}
-	pos += copy(data[pos:],user)
+	pos += copy(data[pos:],this.user)
 	data[pos] = 0
 	pos ++
 	data[pos] = byte(len(scrambleBuff))
 	pos += 1 + copy(data[pos+1:], scrambleBuff)
 	pos += copy(data[pos:], "mysql_native_password")
 	data[pos] = 0x00
-	msgseq++
-	data[3] = msgseq
-	pktLen = pktLen - 4
-	data[0] = byte(pktLen)
-	data[1] = byte(pktLen >> 8)
-	data[2] = byte(pktLen >> 16)
 	return data
 
 }
 
+// 握手密码加密
 func scramblePassword(scramble, password []byte) []byte {
 	if len(password) == 0 {
 		return nil
@@ -154,3 +175,28 @@ func scramblePassword(scramble, password []byte) []byte {
 	}
 	return scramble
 }
+
+// 注册为备用机器
+func (this *MysqlConnection)RegisterSlave(){
+
+}
+
+// 发送指令
+func(this *MysqlConnection)SendCommand(command string){
+
+}
+
+func (this *MysqlConnection)AddAndGetMsgSeq()byte{
+	defer this.seqLock.Unlock()
+	this.seqLock.Lock()
+	this.msgSeq ++
+	return this.msgSeq
+}
+
+func (this *MysqlConnection)SetMsgSeq(msgSeq byte){
+	defer this.seqLock.Unlock()
+	this.seqLock.Lock()
+	this.msgSeq = msgSeq
+}
+
+
