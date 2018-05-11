@@ -52,11 +52,15 @@ func (this *MysqlConnection)ConnectMysql(){
 }
 func (this *MysqlConnection)ReadServerData()([]byte){
 	var bs []byte
-	_,err := this.Conn.Read(sizeBuffer)
+	n,err := this.Conn.Read(sizeBuffer)
+	if n == 0{
+		return bs
+	}
 	bs = append(bs, sizeBuffer...)
 	pkLen := common.BytesToIntWithMin(bs)
-	var bs2 = make([]byte,pkLen+1)
-	this.Conn.Read(bs2)
+	var bs2 = make([]byte,pkLen+2)
+	n,_ = this.Conn.Read(bs2)
+	fmt.Println(n)
 	bs = append(bs, bs2...)
 	if err != nil{
 		panic(errors.New(err.Error()))
