@@ -1,3 +1,3 @@
 package mysql
 
-var BinlogChan = make(chan interface{},4*1024)
+var BinlogChan = make(chan BinlogEvent,4*1024)

@@ -3,7 +3,6 @@ package mysql
 import (
 	"net"
 	"github.com/itgeniusshuai/go_common/common"
-	"errors"
 	"bytes"
 	"fmt"
 	"crypto/sha1"
@@ -188,16 +187,19 @@ func scramblePassword(scramble, password []byte) []byte {
 	return scramble
 }
 
-func (this *MysqlConnection) StartBinlogDumpAndListen(dealBinlogFunc func(v interface{})) error{
+func (this *MysqlConnection) StartBinlogDumpAndListen(dealBinlogFunc func(binlogEvent BinlogEvent)) error{
+	Println("register as a slave")
 	e := this.RegisterSlave()
 	if e != nil{
 		return e
 	}
+	Println("write binlog dump")
 	e = this.WriteBinLogDumpPacket()
 	if e != nil{
 		return e
 	}
 	// 启动日志监听
+	Println("listen binlog")
 	go this.ListenBinlog()
 	// 处理日志
 	go func(){
@@ -205,7 +207,8 @@ func (this *MysqlConnection) StartBinlogDumpAndListen(dealBinlogFunc func(v inte
 			select {
 			case v := <-BinlogChan:
 				switch v := v.(type) {
-				case interface{}:
+				case BinlogEvent:
+					Println("received and deal binlog event")
 					dealBinlogFunc(v)
 				}
 			}
@@ -216,30 +219,48 @@ func (this *MysqlConnection) StartBinlogDumpAndListen(dealBinlogFunc func(v inte
 }
 
 func (this *MysqlConnection)ListenBinlog(){
+	Println("begin listen binlog")
 	for{
-		bs := this.ReadServerData()
-		BinlogChan <- bs
+		bs,err := this.ReadServerData()
+		if err != nil{
+			Println("read Binlog error:",err.Error())
+		}
+		if bs == nil{
+			continue
+		}
+		Println("parse []byte to BinlogEvent")
+		binlogEvnet := ParseBinlogEvent(bs)
+		if binlogEvnet == nil{
+			Println("pase nothing don't send to chan")
+			continue
+		}
+		Println("send BinlogEvent to chan")
+		BinlogChan <- *binlogEvnet
 	}
 }
 
 // 注册为备用机器
 func (this *MysqlConnection)RegisterSlave() error{
 	// 伪装成从服务器
+	Println("writer register packet")
 	e := this.WriteRegisterSlavePacket()
 	if (e != nil){
 		return e
 	}
 	// 心跳周期
-	this.Execute(`SET @master_heartbeat_period=%d;`)
+	Println("set heartbeat period")
+	this.Execute(`SET @master_heartbeat_period=1;`)
 	if (e != nil){
 		return e
 	}
 	// binlog主从事件校验
+	Println("clear checknum")
 	this.Execute(`SET @master_binlog_checksum='NONE'`)
 	if (e != nil){
 		return e
 	}
 	// 半同步复制
+	Println("start semi sync")
 	this.Execute(`SET @rpl_semi_sync_slave = 1;`)
 	if (e != nil){
 		return e
