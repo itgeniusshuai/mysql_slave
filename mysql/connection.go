@@ -25,13 +25,6 @@ type MysqlConnection struct{
 var buffer []byte = make([]byte,1024)
 var sizeBuffer []byte = make([]byte,3)
 
-func makeSureBufSize(size int){
-	if(len(buffer) < size){
-		buffer = make([]byte,size)
-	}
-}
-
-
 func GetMysqlConnection(host string, port int, user string, pwd string,serverId uint32)(*MysqlConnection){
 	myConn := MysqlConnection{Host:host,User:user,Pwd:pwd,Port:port,ServerId:serverId}
 	// 连接mysql
@@ -39,34 +32,35 @@ func GetMysqlConnection(host string, port int, user string, pwd string,serverId 
 	return &myConn
 }
 
-func (this *MysqlConnection)ConnectMysql(){
+func (this *MysqlConnection)ConnectMysql() error{
 	conn, err := net.Dial("tcp",this.Host+":"+common.IntToStr(this.Port))
+	Println("connected to host[%s] port[%d]",this.Host,this.Port)
 	if err != nil{
-		panic(errors.New(err.Error()))
+		Println("can't connect to host[%s] port[%d]",this.Host,this.Port)
+		return err
 	}
 	this.Conn = conn
 	var clientPacket = this.GetWriteAuthShackPacket()
 	this.WriteServerData(clientPacket)
-	bs := this.ReadServerData()
-	fmt.Println(bs)
+	this.ReadServerData()
+	return nil
 }
-func (this *MysqlConnection)ReadServerData()([]byte){
+func (this *MysqlConnection)ReadServerData()([]byte,error){
 	var bs []byte
 	n,err := this.Conn.Read(sizeBuffer)
 	if n == 0{
-		return bs
+		return bs,nil
 	}
 	bs = append(bs, sizeBuffer...)
 	pkLen := common.BytesToIntWithMin(bs)
 	var bs2 = make([]byte,pkLen+2)
 	n,_ = this.Conn.Read(bs2)
-	fmt.Println(n)
 	bs = append(bs, bs2...)
 	if err != nil{
-		panic(errors.New(err.Error()))
+		return nil,err
 	}
 	this.SetMsgSeq(bs[3])
-	return bs
+	return bs,nil
 }
 
 func (this *MysqlConnection)WriteServerData(data []byte) error{
@@ -115,7 +109,7 @@ func (this *MysqlConnection)ParseInitShackPacket(initPacketContent []byte) Proto
 
 // 客户端解析握手
 func (this *MysqlConnection)GetWriteAuthShackPacket() []byte{
-	serverData := this.ReadServerData()
+	serverData,_ := this.ReadServerData()
 	protocolPacket := this.ParseInitShackPacket(serverData)
 	packet := protocolPacket.Packet
 	var shackServerPacket = packet.(ServerShackPacket)
@@ -203,7 +197,9 @@ func (this *MysqlConnection) StartBinlogDumpAndListen(dealBinlogFunc func(v inte
 	if e != nil{
 		return e
 	}
+	// 启动日志监听
 	go this.ListenBinlog()
+	// 处理日志
 	go func(){
 		for {
 			select {
