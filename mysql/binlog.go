@@ -1,9 +1,9 @@
 package mysql
 
 type BinlogEvent struct {
-
+	Content []byte
 }
 
 func ParseBinlogEvent(bs []byte) *BinlogEvent{
-	return &BinlogEvent{}
+	return &BinlogEvent{Content:bs}
 }

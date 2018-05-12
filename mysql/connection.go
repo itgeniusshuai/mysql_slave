@@ -8,6 +8,7 @@ import (
 	"crypto/sha1"
 	"encoding/binary"
 	"sync"
+	"github.com/juju/errors"
 )
 
 type MysqlConnection struct{
@@ -27,7 +28,10 @@ var sizeBuffer []byte = make([]byte,3)
 func GetMysqlConnection(host string, port int, user string, pwd string,serverId uint32)(*MysqlConnection){
 	myConn := MysqlConnection{Host:host,User:user,Pwd:pwd,Port:port,ServerId:serverId}
 	// 连接mysql
-	myConn.ConnectMysql()
+	err := myConn.ConnectMysql()
+	if err != nil{
+		return nil
+	}
 	return &myConn
 }
 
@@ -41,8 +45,12 @@ func (this *MysqlConnection)ConnectMysql() error{
 	this.Conn = conn
 	var clientPacket = this.GetWriteAuthShackPacket()
 	this.WriteServerData(clientPacket)
-	this.ReadServerData()
-	return nil
+	res,_ := this.ReadServerData()
+	if(res[4] == 0){
+		fmt.Println("auth successful")
+		return nil
+	}
+	return errors.New("auth failed")
 }
 func (this *MysqlConnection)ReadServerData()([]byte,error){
 	var bs []byte
@@ -58,7 +66,7 @@ func (this *MysqlConnection)ReadServerData()([]byte,error){
 	if err != nil{
 		return nil,err
 	}
-	this.SetMsgSeq(bs[3])
+	this.SetMsgSeq(bs[3]+1)
 	return bs,nil
 }
 
@@ -67,7 +75,7 @@ func (this *MysqlConnection)WriteServerData(data []byte) error{
 	data[0] = byte(length)
 	data[1] = byte(length >> 8)
 	data[2] = byte(length >> 16)
-	data[3] = this.AddAndGetMsgSeq()
+	data[3] = this.GetAndAddSeqMsg()
 	_,error := this.Conn.Write(data)
 	return error
 }
@@ -78,7 +86,7 @@ func (this *MysqlConnection)ParseInitShackPacket(initPacketContent []byte) Proto
 	packet := ProtocolPacket{}
 	packet.PacketLen = common.BytesToIntWithMin(data[:3])
 	packet.PacketNum = data[3]
-	this.MsgSeq = data[3]
+	this.MsgSeq = data[3] + 1
 	handleShackServerPacket := ServerShackPacket{}
 	handleShackServerPacket.ProtocolVersionNum = data[4]
 	pos := bytes.IndexByte(data[5:],0x00)+5
@@ -132,7 +140,6 @@ func (this *MysqlConnection)GetWriteAuthShackPacket() []byte{
 	// 报文头4+权能4+最大信息长度4+字符编码1+填充值23+用户名n+挑战认证数据n+【数据库n】
 	pktLen := 4 + 4 + 4 + 1 + 23 + len(this.User) + 1 + 1 + len(scrambleBuff) + 21 + 1
 	var data = make([]byte,pktLen)
-	copy(data,serverData[:pktLen])
 	data[4] = byte(powerFlag)
 	data[5] = byte(powerFlag >> 8)
 	data[6] = byte(powerFlag >> 16)
@@ -206,11 +213,7 @@ func (this *MysqlConnection) StartBinlogDumpAndListen(dealBinlogFunc func(binlog
 		for {
 			select {
 			case v := <-BinlogChan:
-				switch v := v.(type) {
-				case BinlogEvent:
-					Println("received and deal binlog event")
-					dealBinlogFunc(v)
-				}
+				dealBinlogFunc(v)
 			}
 
 		}
@@ -224,6 +227,7 @@ func (this *MysqlConnection)ListenBinlog(){
 		bs,err := this.ReadServerData()
 		if err != nil{
 			Println("read Binlog error:",err.Error())
+			continue
 		}
 		if bs == nil{
 			continue
@@ -246,6 +250,13 @@ func (this *MysqlConnection)RegisterSlave() error{
 	e := this.WriteRegisterSlavePacket()
 	if (e != nil){
 		return e
+	}
+	isOk,e := this.ReadOkResult()
+	if (e != nil){
+		return e
+	}
+	if !isOk{
+		return errors.New("register slave faild")
 	}
 	// 心跳周期
 	Println("set heartbeat period")
@@ -272,6 +283,7 @@ func (this *MysqlConnection) WriteRegisterSlavePacket() error{
 	hostname := this.Host
 	user := this.User
 	password := this.Pwd
+	this.SetMsgSeq(0)
 	data := make([]byte, 4+1+4+1+len(hostname)+1+len(user)+1+len(password)+2+4+4)
 	pos := 4
 
@@ -336,33 +348,55 @@ func (this *MysqlConnection)WriteBinLogDumpPacket() error{
 }
 
 // 发送指令
-func(this *MysqlConnection)SendCommand(command byte,arg string){
+func(this *MysqlConnection)SendCommand(command byte,arg string) error{
 	this.SetMsgSeq(0)
 	length := len(arg) + 1
 	data := make([]byte, length+4)
 	data[4] = command
 	copy(data[5:], arg)
-	this.WriteServerData(data)
+	return this.WriteServerData(data)
 }
 
 // 执行查询类指令
 func (this *MysqlConnection)Execute(sql string)error{
-	this.SendCommand(COM_QUERY,sql)
+	err := this.SendCommand(COM_QUERY,sql)
+	if err != nil{
+		Println("execute sql [%s] error :%s",sql,err.Error())
+	}
+	res,err := this.ReadOkResult()
+	if err != nil{
+		Println("execute sql [%s] error :%s",sql,err.Error())
+	}
+	if !res {
+		return errors.New("execute [%s] failed")
+	}
 	return nil
 }
 
 
-func (this *MysqlConnection)AddAndGetMsgSeq()byte{
+func (this *MysqlConnection)GetAndAddSeqMsg()byte{
 	defer this.seqLock.Unlock()
 	this.seqLock.Lock()
+	res := this.MsgSeq
 	this.MsgSeq ++
-	return this.MsgSeq
+	return res
 }
 
 func (this *MysqlConnection)SetMsgSeq(msgSeq byte){
 	defer this.seqLock.Unlock()
 	this.seqLock.Lock()
 	this.MsgSeq = msgSeq
+}
+
+func (this *MysqlConnection)ReadOkResult()(bool,error){
+	res,err := this.ReadServerData()
+	if err != nil{
+		return false,err
+	}
+	if res[4] == 0{
+		return true,nil
+	}
+	return false,nil
 }
 
 
