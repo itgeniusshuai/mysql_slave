@@ -4,11 +4,12 @@ import (
 	"net"
 	"github.com/itgeniusshuai/go_common/common"
 	"bytes"
-	"fmt"
 	"crypto/sha1"
 	"encoding/binary"
 	"sync"
 	"github.com/juju/errors"
+	"github.com/itgeniusshuai/mysql_slave/tools"
+	"os"
 )
 
 type MysqlConnection struct{
@@ -37,9 +38,9 @@ func GetMysqlConnection(host string, port int, user string, pwd string,serverId 
 
 func (this *MysqlConnection)ConnectMysql() error{
 	conn, err := net.Dial("tcp",this.Host+":"+common.IntToStr(this.Port))
-	Println("connected to host[%s] port[%d]",this.Host,this.Port)
+	tools.Println("connected to host[%s] port[%d]",this.Host,this.Port)
 	if err != nil{
-		Println("can't connect to host[%s] port[%d]",this.Host,this.Port)
+		tools.Println("can't connect to host[%s] port[%d]",this.Host,this.Port)
 		return err
 	}
 	this.Conn = conn
@@ -47,7 +48,7 @@ func (this *MysqlConnection)ConnectMysql() error{
 	this.WriteServerData(clientPacket)
 	res,_ := this.ReadServerData()
 	if(res[4] == 0){
-		fmt.Println("auth successful")
+		tools.Println("auth successful")
 		return nil
 	}
 	return errors.New("auth failed")
@@ -120,7 +121,7 @@ func (this *MysqlConnection)GetWriteAuthShackPacket() []byte{
 	protocolPacket := this.ParseInitShackPacket(serverData)
 	packet := protocolPacket.Packet
 	var shackServerPacket = packet.(ServerShackPacket)
-	//fmt.Println(uint32(binary.LittleEndian.Uint16(shackServerPacket.PowerFlagLow)))
+	//fmt.tools.Println(uint32(binary.LittleEndian.Uint16(shackServerPacket.PowerFlagLow)))
 	powerFlag :=
 		CLIENT_PROTOCOL_41 |
 		CLIENT_SECURE_CONNECTION |
@@ -132,7 +133,7 @@ func (this *MysqlConnection)GetWriteAuthShackPacket() []byte{
 		uint32(binary.LittleEndian.Uint16(shackServerPacket.PowerFlagLow))&CLIENT_LONG_FLAG
 
 
-	//fmt.Println(powerFlag)
+	//fmt.tools.Println(powerFlag)
 	challengeRandNum := shackServerPacket.ChallengeRandNum
 	challengeRandNum = append(challengeRandNum, shackServerPacket.ChallengeRandNum2...)
 
@@ -195,18 +196,18 @@ func scramblePassword(scramble, password []byte) []byte {
 }
 
 func (this *MysqlConnection) StartBinlogDumpAndListen(dealBinlogFunc func(binlogEvent BinlogEvent)) error{
-	Println("register as a slave")
+	tools.Println("register as a slave")
 	e := this.RegisterSlave()
 	if e != nil{
 		return e
 	}
-	Println("write binlog dump")
+	tools.Println("dump binlog")
 	isOk := this.DumpBinlog()
 	if !isOk{
 		return errors.New("dump binlog failed")
 	}
 	// 启动日志监听
-	Println("listen binlog")
+	tools.Println("listen binlog")
 	go this.ListenBinlog()
 	// 处理日志
 	go func(){
@@ -221,23 +222,23 @@ func (this *MysqlConnection) StartBinlogDumpAndListen(dealBinlogFunc func(binlog
 }
 
 func (this *MysqlConnection)ListenBinlog(){
-	Println("begin listen binlog")
+	tools.Println("begin listen binlog")
 	for{
 		bs,err := this.ReadServerData()
 		if err != nil{
-			Println("read Binlog error:",err.Error())
+			tools.Println("read Binlog error:",err.Error())
 			continue
 		}
 		if bs == nil{
 			continue
 		}
-		Println("parse []byte to BinlogEvent")
+		tools.Println("parse []byte to BinlogEvent")
 		binlogEvnet := ParseBinlogEvent(bs)
 		if binlogEvnet == nil{
-			Println("pase nothing don't send to chan")
+			tools.Println("pase nothing don't send to chan")
 			continue
 		}
-		Println("send BinlogEvent to chan")
+		tools.Println("send BinlogEvent to chan")
 		BinlogChan <- *binlogEvnet
 	}
 }
@@ -245,7 +246,7 @@ func (this *MysqlConnection)ListenBinlog(){
 // 注册为备用机器
 func (this *MysqlConnection)RegisterSlave() error{
 	// 伪装成从服务器
-	Println("writer register packet")
+	tools.Println("writer register packet")
 	e := this.WriteRegisterSlavePacket()
 	if (e != nil){
 		return e
@@ -255,19 +256,19 @@ func (this *MysqlConnection)RegisterSlave() error{
 		return errors.New("register slave faild")
 	}
 	// 心跳周期
-	Println("set heartbeat period")
+	tools.Println("set heartbeat period")
 	this.Execute(`SET @master_heartbeat_period=1;`)
 	if (e != nil){
 		return e
 	}
 	// binlog主从事件校验
-	Println("clear checknum")
+	tools.Println("clear checknum")
 	this.Execute(`SET @master_binlog_checksum='NONE'`)
 	if (e != nil){
 		return e
 	}
 	// 半同步复制
-	Println("start semi sync")
+	tools.Println("start semi sync")
 	this.Execute(`SET @rpl_semi_sync_slave = 1;`)
 	if (e != nil){
 		return e
@@ -276,9 +277,10 @@ func (this *MysqlConnection)RegisterSlave() error{
 }
 
 func (this *MysqlConnection) DumpBinlog() bool{
+	tools.Println("write binlog dump packet")
 	err := this.WriteBinLogDumpPacket()
 	if err != nil{
-		Println("write binlog packet error"+err.Error())
+		tools.Println("write binlog packet error"+err.Error())
 		return false
 	}
 	isOk := this.ReadOkResult()
@@ -286,7 +288,7 @@ func (this *MysqlConnection) DumpBinlog() bool{
 }
 
 func (this *MysqlConnection) WriteRegisterSlavePacket() error{
-	hostname := this.Host
+	hostname,_ := os.Hostname()
 	user := this.User
 	password := this.Pwd
 	this.SetMsgSeq(0)
@@ -339,7 +341,7 @@ func (this *MysqlConnection)WriteBinLogDumpPacket() error{
 	data[pos] = COM_BINLOG_DUMP
 	pos++
 
-	binary.LittleEndian.PutUint32(data[pos:], 0)
+	binary.LittleEndian.PutUint32(data[pos:], 4)
 	pos += 4
 
 	binary.LittleEndian.PutUint16(data[pos:], BINLOG_DUMP_NEVER_STOP)
@@ -367,7 +369,7 @@ func(this *MysqlConnection)SendCommand(command byte,arg string) error{
 func (this *MysqlConnection)Execute(sql string)error{
 	err := this.SendCommand(COM_QUERY,sql)
 	if err != nil{
-		Println("execute sql [%s] error :%s",sql,err.Error())
+		tools.Println("execute sql [%s] error :%s",sql,err.Error())
 	}
 	res := this.ReadOkResult()
 	if !res {
@@ -394,13 +396,13 @@ func (this *MysqlConnection)SetMsgSeq(msgSeq byte){
 func (this *MysqlConnection)ReadOkResult() bool{
 	res,err := this.ReadServerData()
 	if err != nil{
-		Println("it is not a ok result error %s",err.Error())
+		tools.Println("it is not a ok result error %s",err.Error())
 		return false
 	}
 	if res[4] == 0{
 		return true
 	}
-	Println("it is not a ok result,result is "+common.BytesToStr(res[4:]))
+	tools.Println("it is not a ok result,result is "+common.BytesToStr(res[4:]))
 	return false
 }
 
