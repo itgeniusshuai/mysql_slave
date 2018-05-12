@@ -1,4 +1,4 @@
-package mysql
+package slave
 
 type ServerShackPacket struct {
 	ProtocolVersionNum byte

@@ -1,4 +1,4 @@
-package mysql
+package slave
 
 type BinlogEvent struct {
 	Content []byte

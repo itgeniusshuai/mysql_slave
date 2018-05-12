@@ -1,4 +1,4 @@
-package mysql
+package slave
 
 const(
 	CLIENT_LONG_PASSWORD	= 0x0001
@@ -28,4 +28,6 @@ const(
 	BINLOG_DUMP_NEVER_STOP = 0x00
 
 	MAX_PACKET_SIZE = 1 << 24 - 1
+
+	DEFAULT_POOL_SIZE = 3
 )
