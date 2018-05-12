@@ -120,7 +120,7 @@ func (this *MysqlConnection)GetWriteAuthShackPacket() []byte{
 	protocolPacket := this.ParseInitShackPacket(serverData)
 	packet := protocolPacket.Packet
 	var shackServerPacket = packet.(ServerShackPacket)
-	fmt.Println(uint32(binary.LittleEndian.Uint16(shackServerPacket.PowerFlagLow)))
+	//fmt.Println(uint32(binary.LittleEndian.Uint16(shackServerPacket.PowerFlagLow)))
 	powerFlag :=
 		CLIENT_PROTOCOL_41 |
 		CLIENT_SECURE_CONNECTION |
@@ -132,7 +132,7 @@ func (this *MysqlConnection)GetWriteAuthShackPacket() []byte{
 		uint32(binary.LittleEndian.Uint16(shackServerPacket.PowerFlagLow))&CLIENT_LONG_FLAG
 
 
-	fmt.Println(powerFlag)
+	//fmt.Println(powerFlag)
 	challengeRandNum := shackServerPacket.ChallengeRandNum
 	challengeRandNum = append(challengeRandNum, shackServerPacket.ChallengeRandNum2...)
 
@@ -201,9 +201,9 @@ func (this *MysqlConnection) StartBinlogDumpAndListen(dealBinlogFunc func(binlog
 		return e
 	}
 	Println("write binlog dump")
-	e = this.WriteBinLogDumpPacket()
-	if e != nil{
-		return e
+	isOk := this.DumpBinlog()
+	if !isOk{
+		return errors.New("dump binlog failed")
 	}
 	// 启动日志监听
 	Println("listen binlog")
@@ -215,7 +215,6 @@ func (this *MysqlConnection) StartBinlogDumpAndListen(dealBinlogFunc func(binlog
 			case v := <-BinlogChan:
 				dealBinlogFunc(v)
 			}
-
 		}
 	}()
 	return nil
@@ -251,10 +250,7 @@ func (this *MysqlConnection)RegisterSlave() error{
 	if (e != nil){
 		return e
 	}
-	isOk,e := this.ReadOkResult()
-	if (e != nil){
-		return e
-	}
+	isOk := this.ReadOkResult()
 	if !isOk{
 		return errors.New("register slave faild")
 	}
@@ -277,6 +273,16 @@ func (this *MysqlConnection)RegisterSlave() error{
 		return e
 	}
 	return nil
+}
+
+func (this *MysqlConnection) DumpBinlog() bool{
+	err := this.WriteBinLogDumpPacket()
+	if err != nil{
+		Println("write binlog packet error"+err.Error())
+		return false
+	}
+	isOk := this.ReadOkResult()
+	return isOk
 }
 
 func (this *MysqlConnection) WriteRegisterSlavePacket() error{
@@ -363,10 +369,7 @@ func (this *MysqlConnection)Execute(sql string)error{
 	if err != nil{
 		Println("execute sql [%s] error :%s",sql,err.Error())
 	}
-	res,err := this.ReadOkResult()
-	if err != nil{
-		Println("execute sql [%s] error :%s",sql,err.Error())
-	}
+	res := this.ReadOkResult()
 	if !res {
 		return errors.New("execute [%s] failed")
 	}
@@ -388,15 +391,17 @@ func (this *MysqlConnection)SetMsgSeq(msgSeq byte){
 	this.MsgSeq = msgSeq
 }
 
-func (this *MysqlConnection)ReadOkResult()(bool,error){
+func (this *MysqlConnection)ReadOkResult() bool{
 	res,err := this.ReadServerData()
 	if err != nil{
-		return false,err
+		Println("it is not a ok result error %s",err.Error())
+		return false
 	}
 	if res[4] == 0{
-		return true,nil
+		return true
 	}
-	return false,nil
+	Println("it is not a ok result,result is "+common.BytesToStr(res[4:]))
+	return false
 }
 
 
