@@ -1,4 +1,4 @@
-package slave
+package monitor
 
 type MonitorInfo struct {
 	// binlog数量
