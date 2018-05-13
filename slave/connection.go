@@ -195,7 +195,7 @@ func scramblePassword(scramble, password []byte) []byte {
 	return scramble
 }
 
-func (this *MysqlConnection) StartBinlogDumpAndListen(dealBinlogFunc func(binlogEvent BinlogEvent)) error{
+func (this *MysqlConnection) StartBinlogDumpAndListen(dealBinlogFunc func(binlogEventStruct BinlogEventStruct)) error{
 	tools.Println("register as a slave")
 	e := this.RegisterSlave()
 	if e != nil{
