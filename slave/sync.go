@@ -1,3 +1,3 @@
 package slave
 
-var BinlogChan = make(chan BinlogEvent,4*1024)
+var BinlogChan = make(chan BinlogEventStruct,4*1024)

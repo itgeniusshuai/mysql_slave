@@ -233,7 +233,7 @@ func (this *MysqlConnection)ListenBinlog(){
 			continue
 		}
 		tools.Println("parse []byte to BinlogEvent")
-		binlogEvnet := ParseBinlogEvent(bs)
+		binlogEvnet := ParseEvent(bs)
 		if binlogEvnet == nil{
 			tools.Println("pase nothing don't send to chan")
 			continue
