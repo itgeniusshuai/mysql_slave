@@ -12,6 +12,7 @@ import (
 	"strings"
 	"reflect"
 	"unsafe"
+	"github.com/itgeniusshuai/mysql_slave/tools"
 )
 
 var tableMap = make(map[int]TableMapBinlogEvent,0)
@@ -54,20 +55,37 @@ type BinlogHeader struct{
 
 // 解析事件头每个事件都一样
 func ParseBinlogHeader(bs []byte) *BinlogHeader{
+	size := 19 + 4 + 1
+	if len(bs) < size{
+		return nil
+	}
+	pos := 4 + 1
 	binlogHeader := BinlogHeader{}
-	binlogHeader.TimeStamp = common.BytesToIntWithMin(bs[:4])
-	binlogHeader.TypeCode = bs[4]
-	binlogHeader.ServerId = bs[5:9]
-	binlogHeader.EventLength = common.BytesToIntWithMin(bs[9:13])
-	binlogHeader.NextPosition = common.BytesToIntWithMin(bs[13:17])
-	binlogHeader.Flags = bs[17:19]
+	binlogHeader.TimeStamp = common.BytesToIntWithMin(bs[pos:pos + 4])
+	pos += 4
+	binlogHeader.TypeCode = bs[pos]
+	tools.Println("type code :%d",binlogHeader.TypeCode)
+	binlogHeader.ServerId = bs[pos:pos+4]
+	pos +=4
+	binlogHeader.EventLength = common.BytesToIntWithMin(bs[pos:pos+4])
+	pos +=4
+	binlogHeader.NextPosition = common.BytesToIntWithMin(bs[pos:pos+4])
+	pos +=4
+	binlogHeader.Flags = bs[pos:pos+2]
+	if binlogHeader.EventLength < size{
+		return nil
+	}
 	return &binlogHeader
 }
 
 // 解析事件（包含头和体）
 func ParseEvent(bs []byte) *BinlogEventStruct{
+	//tools.Println("received event %s",common.BytesToStr(bs))
 	binlogEventStruct := BinlogEventStruct{}
 	header := ParseBinlogHeader(bs)
+	if header == nil{
+		return nil
+	}
 	binlogEventStruct.BinlogHeader = *header
 	var binlogEvent BinlogEvent
 	// 只解析增删改查的行事件
@@ -86,7 +104,7 @@ func ParseEvent(bs []byte) *BinlogEventStruct{
 
 // 具体事件的解析实现
 func (this *RowBinlogEvent) ParseEvent(bs []byte){
-	pos := 19
+	pos := 19 + 4 + 2
 	this.TableId = common.BytesToIntWithMin(bs[pos:pos+6])
 	pos += 6 + 2 // 2 bytes Reserved for future use.
 	this.FieldIsUsed = bs[pos:pos+2]
@@ -337,7 +355,7 @@ type TableMapBinlogEvent struct {
 }
 
 func (this *TableMapBinlogEvent)ParseEvent(bs []byte){
-	pos := 19
+	pos := 19 + 4
 	this.TableId = common.BytesToIntWithMin(bs[pos:pos+6])
 	pos += 6 + 2 // 2 bytes Reserved for future use.
 	// 存入表映射

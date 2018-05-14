@@ -232,14 +232,17 @@ func (this *MysqlConnection)ListenBinlog(){
 		if bs == nil{
 			continue
 		}
+		if bs[4] != 0{
+			continue
+		}
 		tools.Println("parse []byte to BinlogEvent")
-		binlogEvnet := ParseEvent(bs)
-		if binlogEvnet == nil{
-			tools.Println("pase nothing don't send to chan")
+		binlogEvent := ParseEvent(bs)
+		if binlogEvent == nil{
+			tools.Println("parse nothing don't send to chan")
 			continue
 		}
 		tools.Println("send BinlogEvent to chan")
-		BinlogChan <- *binlogEvnet
+		BinlogChan <- *binlogEvent
 	}
 }
 
@@ -257,7 +260,7 @@ func (this *MysqlConnection)RegisterSlave() error{
 	}
 	// 心跳周期
 	tools.Println("set heartbeat period")
-	this.Execute(`SET @master_heartbeat_period=1;`)
+	//this.Execute(`SET @master_heartbeat_period=1;`)
 	if (e != nil){
 		return e
 	}
@@ -269,7 +272,7 @@ func (this *MysqlConnection)RegisterSlave() error{
 	}
 	// 半同步复制
 	tools.Println("start semi sync")
-	this.Execute(`SET @rpl_semi_sync_slave = 1;`)
+	//this.Execute(`SET @rpl_semi_sync_slave = 1;`)
 	if (e != nil){
 		return e
 	}
