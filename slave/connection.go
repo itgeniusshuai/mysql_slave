@@ -272,7 +272,7 @@ func (this *MysqlConnection)RegisterSlave() error{
 	}
 	// 半同步复制
 	tools.Println("start semi sync")
-	//this.Execute(`SET @rpl_semi_sync_slave = 1;`)
+	this.Execute(`SET @rpl_semi_sync_slave = 1;`)
 	if (e != nil){
 		return e
 	}

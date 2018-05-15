@@ -90,8 +90,8 @@ func ParseEvent(bs []byte) *BinlogEventStruct{
 	var binlogEvent BinlogEvent
 	// 只解析增删改查的行事件
 	switch header.TypeCode {
-	//case WRITE_ROWS_EVENT,WRITE_ROWS_EVENT_V1,UPDATE_ROWS_EVENT,UPDATE_ROWS_EVENT_V1,DELETE_ROWS_EVENT,DELETE_ROWS_EVENT_V1:
-	//	binlogEvent = &RowBinlogEvent{TypeCode:header.TypeCode}
+	case WRITE_ROWS_EVENT,WRITE_ROWS_EVENT_V1,UPDATE_ROWS_EVENT,UPDATE_ROWS_EVENT_V1,DELETE_ROWS_EVENT,DELETE_ROWS_EVENT_V1:
+		binlogEvent = &RowBinlogEvent{TypeCode:header.TypeCode}
 	case TABLE_MAP_EVENT:
 		binlogEvent = &TableMapBinlogEvent{}
 	default:
@@ -122,8 +122,11 @@ func (this *RowBinlogEvent) ParseEvent(bs []byte){
 	}
 	// 每个recored 包含一个是否为空的bitset及
 	// 获取列信息
-	tableMapEvent := tableMap[this.TableId]
-	for pos < len(bs) {
+	tableMapEvent,_ := tableMap[this.TableId]
+	//if !ok{
+	//	return
+	//}
+	for pos < len(bs)-24 {
 		n,_= this.decodeRows(bs[pos:], &tableMapEvent, this.FieldIsUsed)
 		pos += n
 
@@ -378,11 +381,13 @@ func (this *TableMapBinlogEvent)ParseEvent(bs []byte){
 	this.ColumnTypes = bs[pos: pos+int(this.ColumnCount)]
 	pos = pos+int(this.ColumnCount)
 	// 元数据块长度 int
-	count,_,n = LengthEncodedInt(bs[pos:])
-	this.MetaBlockLength = count
-	pos += int(count)
+	var metaData []byte
+	metaData,_,n,_ = tools.LengthEnodedString(bs[pos:])
+	//count,_,n = LengthEncodedInt(bs[pos:])
+	//this.MetaBlockLength = count
+	//pos += int(count)
 	// 元数据块 可变长度
-	this.decodeMeta(bs[pos:])
+	this.decodeMeta(metaData)
 	// 是否每列为空 可变长度 INT((N+7)/8) bytes：如 n=8 为1byte，n=9为2byte
 	// 将表数据类型存入缓存
 	tableMap[this.TableId] = *this
