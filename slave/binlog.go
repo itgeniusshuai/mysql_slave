@@ -90,8 +90,8 @@ func ParseEvent(bs []byte) *BinlogEventStruct{
 	var binlogEvent BinlogEvent
 	// 只解析增删改查的行事件
 	switch header.TypeCode {
-	case WRITE_ROWS_EVENT,WRITE_ROWS_EVENT_V1,UPDATE_ROWS_EVENT,UPDATE_ROWS_EVENT_V1,DELETE_ROWS_EVENT,DELETE_ROWS_EVENT_V1:
-		binlogEvent = &RowBinlogEvent{TypeCode:header.TypeCode}
+	//case WRITE_ROWS_EVENT,WRITE_ROWS_EVENT_V1,UPDATE_ROWS_EVENT,UPDATE_ROWS_EVENT_V1,DELETE_ROWS_EVENT,DELETE_ROWS_EVENT_V1:
+	//	binlogEvent = &RowBinlogEvent{TypeCode:header.TypeCode}
 	case TABLE_MAP_EVENT:
 		binlogEvent = &TableMapBinlogEvent{}
 	default:
@@ -104,7 +104,7 @@ func ParseEvent(bs []byte) *BinlogEventStruct{
 
 // 具体事件的解析实现
 func (this *RowBinlogEvent) ParseEvent(bs []byte){
-	pos := 19 + 4 + 2
+	pos := 19 + 4 + 1
 	this.TableId = common.BytesToIntWithMin(bs[pos:pos+6])
 	pos += 6 + 2 // 2 bytes Reserved for future use.
 	this.FieldIsUsed = bs[pos:pos+2]
@@ -355,29 +355,28 @@ type TableMapBinlogEvent struct {
 }
 
 func (this *TableMapBinlogEvent)ParseEvent(bs []byte){
-	pos := 19 + 4
+	pos := 19 + 4 + 1
 	this.TableId = common.BytesToIntWithMin(bs[pos:pos+6])
 	pos += 6 + 2 // 2 bytes Reserved for future use.
 	// 存入表映射
 	this.DbNameLength = bs[pos]
 	pos ++
 	// 数据库名称可变长度
-	endPos := bytes.IndexByte(bs[pos:],0x00)+1
-	this.DbName = common.BytesToStr(bs[pos:endPos])
-	pos = endPos
+	this.DbName = common.BytesToStr(bs[pos:int(this.DbNameLength)+pos])
+	pos = int(this.DbNameLength)+pos+1
 	// 表名长度 1byte
 	this.TableNameLength = bs[pos]
+	pos ++
 	// 表名 可变长度
-	endPos = bytes.IndexByte(bs[pos:],0x00)+1
-	this.TableName = common.BytesToStr(bs[pos:endPos])
-	pos = endPos
+	this.TableName = common.BytesToStr(bs[pos:int(this.TableNameLength)+pos])
+	pos = int(this.TableNameLength)+pos+1
 	// 表中列数 int
 	count,_,n := LengthEncodedInt(bs[pos:])
 	this.ColumnCount = count
 	pos += n
-	// 列类型 可变长度，每列一个字节
+	// 列类型 可变长度，每列一个字节 todo
 	this.ColumnTypes = bs[pos: pos+int(this.ColumnCount)]
-	pos += pos+int(this.ColumnCount)
+	pos = pos+int(this.ColumnCount)
 	// 元数据块长度 int
 	count,_,n = LengthEncodedInt(bs[pos:])
 	this.MetaBlockLength = count
