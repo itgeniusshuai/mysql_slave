@@ -61,7 +61,7 @@ func (this *MysqlConnection)ReadServerData()([]byte,error){
 	}
 	bs = append(bs, sizeBuffer...)
 	pkLen := common.BytesToIntWithMin(bs)
-	var bs2 = make([]byte,pkLen+2)
+	var bs2 = make([]byte,pkLen+1)
 	n,_ = this.Conn.Read(bs2)
 	bs = append(bs, bs2...)
 	if err != nil{
@@ -127,10 +127,11 @@ func (this *MysqlConnection)GetWriteAuthShackPacket() []byte{
 		CLIENT_SECURE_CONNECTION |
 		CLIENT_LONG_PASSWORD |
 		CLIENT_TRANSACTIONS |
-		CLIENT_PLUGIN_AUTH |
-		CLIENT_LOCAL_FILES |
-		CLIENT_MULTI_RESULTS|
-		uint32(binary.LittleEndian.Uint16(shackServerPacket.PowerFlagLow))&CLIENT_LONG_FLAG
+			CLIENT_LONG_FLAG
+		//CLIENT_PLUGIN_AUTH |
+		//CLIENT_LOCAL_FILES |
+		//CLIENT_MULTI_RESULTS|
+		//uint32(binary.LittleEndian.Uint16(shackServerPacket.PowerFlagLow))&CLIENT_LONG_FLAG
 
 
 	//fmt.tools.Println(powerFlag)
@@ -248,15 +249,11 @@ func (this *MysqlConnection)ListenBinlog(){
 
 // 注册为备用机器
 func (this *MysqlConnection)RegisterSlave() error{
-	// 伪装成从服务器
-	tools.Println("writer register packet")
-	e := this.WriteRegisterSlavePacket()
-	if (e != nil){
+	// binlog主从事件校验
+	tools.Println("clear checknum")
+	e := this.Execute(`SET @master_binlog_checksum='NONE'`)
+	if e != nil{
 		return e
-	}
-	isOk := this.ReadOkResult()
-	if !isOk{
-		return errors.New("register slave faild")
 	}
 	// 心跳周期
 	tools.Println("set heartbeat period")
@@ -264,18 +261,24 @@ func (this *MysqlConnection)RegisterSlave() error{
 	if (e != nil){
 		return e
 	}
-	// binlog主从事件校验
-	tools.Println("clear checknum")
-	this.Execute(`SET @master_binlog_checksum='NONE'`)
+	// 伪装成从服务器
+	tools.Println("writer register packet")
+	e = this.WriteRegisterSlavePacket()
 	if (e != nil){
 		return e
 	}
+	isOk := this.ReadOkResult()
+	if !isOk{
+		return errors.New("register slave faild")
+	}
+
+
 	// 半同步复制
-	tools.Println("start semi sync")
-	this.Execute(`SET @rpl_semi_sync_slave = 1;`)
-	if (e != nil){
-		return e
-	}
+	//tools.Println("start semi sync")
+	//this.Execute(`SET @rpl_semi_sync_slave = 1;`)
+	//if (e != nil){
+	//	return e
+	//}
 	return nil
 }
 

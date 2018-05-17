@@ -57,6 +57,7 @@ type BinlogHeader struct{
 func ParseBinlogHeader(bs []byte) *BinlogHeader{
 	size := 19 + 4 + 1
 	if len(bs) < size{
+		fmt.Println("size is %d",len(bs))
 		return nil
 	}
 	pos := 4 + 1
@@ -64,6 +65,10 @@ func ParseBinlogHeader(bs []byte) *BinlogHeader{
 	binlogHeader.TimeStamp = common.BytesToIntWithMin(bs[pos:pos + 4])
 	pos += 4
 	binlogHeader.TypeCode = bs[pos]
+	if binlogHeader.TypeCode > 30{
+		fmt.Println(common.BytesToStr(bs[:2048]))
+		fmt.Println("dfsfsd")
+	}
 	tools.Println("type code :%d",binlogHeader.TypeCode)
 	binlogHeader.ServerId = bs[pos:pos+4]
 	pos +=4
