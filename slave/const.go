@@ -1,6 +1,13 @@
 package slave
 
 const(
+	MAX_PACKET_SIZE = 2 << 24 - 1
+
+	DEFAULT_POOL_SIZE = 3
+
+	COM_PING = 0x0e
+)
+const(
 	CLIENT_LONG_PASSWORD	= 0x0001
 	CLIENT_FOUND_ROWS	= 0x0002	
 	CLIENT_LONG_FLAG	= 0x0004	
@@ -20,20 +27,15 @@ const(
 	CLIENT_MULTI_STATEMENTS	= 0x00010000
 	CLIENT_MULTI_RESULTS	= 0x00020000
 	CLIENT_PLUGIN_AUTH	= 0x80000
-
-
+)
+const(
 	COM_QUERY = 0x03
 	COM_REGISTER_SLAVE = 0x15
 	COM_BINLOG_DUMP = 0x12
 	BINLOG_DUMP_NEVER_STOP = 0x00
+)
 
-	MAX_PACKET_SIZE = 1 << 24 - 1
-
-	DEFAULT_POOL_SIZE = 3
-
-	COM_PING = 0x0e
-
-
+const(
 	// 事件类
 	UNKNOWN_EVENT= 0
 	START_EVENT_V3= 1
@@ -47,11 +49,6 @@ const(
 	APPEND_BLOCK_EVENT= 9
 	EXEC_LOAD_EVENT= 10
 	DELETE_FILE_EVENT= 11
-	/**
-	  NEW_LOAD_EVENT is like LOAD_EVENT except that it has a longer
-	  sql_ex  allowing multibyte TERMINATED BY etc; both types share the
-	  same class (Load_event)
-	*/
 	NEW_LOAD_EVENT= 12
 	RAND_EVENT= 13
 	USER_VAR_EVENT= 14
@@ -59,66 +56,27 @@ const(
 	XID_EVENT= 16
 	BEGIN_LOAD_QUERY_EVENT= 17
 	EXECUTE_LOAD_QUERY_EVENT= 18
-
 	TABLE_MAP_EVENT = 19
-
-	/**
-	  The PRE_GA event numbers were used for 5.1.0 to 5.1.15 and are
-	  therefore obsolete.
-	 */
 	PRE_GA_WRITE_ROWS_EVENT = 20
 	PRE_GA_UPDATE_ROWS_EVENT = 21
 	PRE_GA_DELETE_ROWS_EVENT = 22
-
-	/**
-	  The V1 event numbers are used from 5.1.16 until mysql-trunk-xx
-	*/
 	WRITE_ROWS_EVENT_V1 = 23
 	UPDATE_ROWS_EVENT_V1 = 24
 	DELETE_ROWS_EVENT_V1 = 25
-
-	/**
-	  Something out of the ordinary happened on the master
-	 */
 	INCIDENT_EVENT= 26
-
-	/**
-	  Heartbeat event to be send by master at its idle time
-	  to ensure master's online status to slave
-	*/
 	HEARTBEAT_LOG_EVENT= 27
-
-	/**
-	  In some situations  it is necessary to send over ignorable
-	  data to the slave: data that a slave can handle in case there
-	  is code for handling it  but which can be ignored if it is not
-	  recognized.
-	*/
 	IGNORABLE_LOG_EVENT= 28
 	ROWS_QUERY_LOG_EVENT= 29
-
-	/** Version 2 of the Row events */
 	WRITE_ROWS_EVENT = 30
 	UPDATE_ROWS_EVENT = 31
 	DELETE_ROWS_EVENT = 32
-
 	GTID_LOG_EVENT= 33
 	ANONYMOUS_GTID_LOG_EVENT= 34
-
 	PREVIOUS_GTIDS_LOG_EVENT= 35
-
 	TRANSACTION_CONTEXT_EVENT= 36
-
 	VIEW_CHANGE_EVENT= 37
-
-	/* Prepared XA transaction terminal event similar to Xid */
 	XA_PREPARE_LOG_EVENT= 38
-		/**
-	  Add new events here - right above this comment!
-	  Existing events (except ENUM_END_EVENT) should never change their numbers
-	*/
 )
-
 
 const (
 	MYSQL_TYPE_JSON byte = iota + 0xf5
@@ -157,3 +115,4 @@ const (
 	MYSQL_TYPE_DATETIME2
 	MYSQL_TYPE_TIME2
 )
+

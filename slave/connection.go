@@ -53,21 +53,45 @@ func (this *MysqlConnection)ConnectMysql() error{
 	}
 	return errors.New("auth failed")
 }
+
+// 考虑分包
+// 分包格式为
+// ff ff ff 00
+// 00 00 00 01
+// 00 00 00 02
+// 直到小于0xfffff
 func (this *MysqlConnection)ReadServerData()([]byte,error){
 	var bs []byte
-	n,err := this.Conn.Read(sizeBuffer)
-	if n == 0{
-		return bs,nil
+	var flag = false
+	for{
+		n,err := this.Conn.Read(sizeBuffer)
+		if n == 0{
+			return bs,nil
+		}
+		if err != nil{
+			return nil,err
+		}
+		bs = append(bs, sizeBuffer...)
+		pkLen := common.BytesToIntWithMin(bs)
+		// 分包
+		var bs2 []byte
+		switch pkLen {
+		case MAX_PACKET_SIZE,0x00:
+			//分包内容，读取0xfffff字节
+			 bs2 = make([]byte,MAX_PACKET_SIZE)
+		default:
+			// 不分包
+			bs2 = make([]byte,pkLen+1)
+			flag = true
+		}
+		n,_ = this.Conn.Read(bs2)
+		bs = append(bs, bs2...)
+		this.SetMsgSeq(bs[3]+1)
+		if flag{
+			break
+		}
 	}
-	bs = append(bs, sizeBuffer...)
-	pkLen := common.BytesToIntWithMin(bs)
-	var bs2 = make([]byte,pkLen+1)
-	n,_ = this.Conn.Read(bs2)
-	bs = append(bs, bs2...)
-	if err != nil{
-		return nil,err
-	}
-	this.SetMsgSeq(bs[3]+1)
+
 	return bs,nil
 }
 
