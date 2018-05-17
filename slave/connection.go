@@ -11,6 +11,7 @@ import (
 	"github.com/itgeniusshuai/mysql_slave/tools"
 	"os"
 	"time"
+	"io"
 )
 
 type MysqlConnection struct{
@@ -66,38 +67,59 @@ func (this *MysqlConnection)ConnectMysql() error{
 // 直到小于0xfffff
 func (this *MysqlConnection)ReadServerData()([]byte,error){
 	var bs []byte
-	var flag = false
-	for{
-		n,err := this.Conn.Read(sizeBuffer)
-		if n == 0{
-			return bs,nil
-		}
-		if err != nil{
-			return nil,err
-		}
-		bs = append(bs, sizeBuffer...)
-		pkLen := common.BytesToIntWithMin(bs)
-		// 分包
-		var bs2 []byte
-		switch pkLen {
-		case MAX_PACKET_SIZE,0x00:
-			//分包内容，读取0xfffff字节
-			 bs2 = make([]byte,MAX_PACKET_SIZE)
-		default:
-			// 不分包
-			bs2 = make([]byte,pkLen+1)
-			flag = true
-		}
-		n,_ = this.Conn.Read(bs2)
-		bs = append(bs, bs2...)
-		this.SetMsgSeq(bs[3]+1)
-		if flag{
-			break
-		}
+	var byteBuff bytes.Buffer
+	n,err := io.ReadFull(this.Conn,sizeBuffer)
+	if n == 0{
+		return bs,nil
 	}
-
+	if err != nil{
+		return nil,err
+	}
+	bs = append(bs, sizeBuffer...)
+	pkLen := common.BytesToInt64WithMin(bs)
+	// 分包
+	io.CopyN(&byteBuff,this.Conn,pkLen+1)
+	bs = append(bs, byteBuff.Bytes()...)
+	this.SetMsgSeq(bs[3]+1)
 	return bs,nil
 }
+// 发生粘包
+//func (this *MysqlConnection)ReadServerData()([]byte,error){
+//	var bs []byte
+//	var byteBuff bytes.Buffer
+//	var flag = false
+//	for{
+//		//n,err := this.Conn.Read(sizeBuffer)
+//		n,err := io.ReadFull(this.Conn,sizeBuffer)
+//		if n == 0{
+//			return bs,nil
+//		}
+//		if err != nil{
+//			return nil,err
+//		}
+//		bs = append(bs, sizeBuffer...)
+//		pkLen := common.BytesToIntWithMin(bs)
+//		// 分包
+//		var bs2 []byte
+//		switch pkLen {
+//		case MAX_PACKET_SIZE,0x00:
+//			//分包内容，读取0xfffff字节
+//			 bs2 = make([]byte,MAX_PACKET_SIZE)
+//		default:
+//			// 不分包
+//			bs2 = make([]byte,pkLen+1024)
+//			flag = true
+//		}
+//		n,_ = this.Conn.Read(bs2)
+//		bs = append(bs, bs2[:n]...)
+//		this.SetMsgSeq(bs[3]+1)
+//		if flag{
+//			break
+//		}
+//	}
+//
+//	return bs,nil
+//}
 
 func (this *MysqlConnection)WriteServerData(data []byte) error{
 	length := len(data) - 4
@@ -199,25 +221,19 @@ func scramblePassword(scramble, password []byte) []byte {
 	if len(password) == 0 {
 		return nil
 	}
-
-	// stage1Hash = SHA1(password)
 	crypt := sha1.New()
 	crypt.Write(password)
 	stage1 := crypt.Sum(nil)
 
-	// scrambleHash = SHA1(scramble + SHA1(stage1Hash))
-	// inner Hash
 	crypt.Reset()
 	crypt.Write(stage1)
 	hash := crypt.Sum(nil)
 
-	// outer Hash
 	crypt.Reset()
 	crypt.Write(scramble)
 	crypt.Write(hash)
 	scramble = crypt.Sum(nil)
 
-	// token = scrambleHash XOR stage1Hash
 	for i := range scramble {
 		scramble[i] ^= stage1[i]
 	}
@@ -259,6 +275,9 @@ func (this *MysqlConnection)ListenBinlog(){
 			continue
 		}
 		if bs == nil{
+			continue
+		}
+		if len(bs) < 4{
 			continue
 		}
 		if bs[4] != 0{

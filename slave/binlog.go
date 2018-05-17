@@ -13,9 +13,23 @@ import (
 	"reflect"
 	"unsafe"
 	"github.com/itgeniusshuai/mysql_slave/tools"
+	"sync"
 )
 
 var tableMap = make(map[int]TableMapBinlogEvent,0)
+var tableMapLock = sync.Mutex{}
+
+func putTableMap(tableId int, event TableMapBinlogEvent){
+	defer tableMapLock.Unlock()
+	tableMapLock.Lock()
+	tableMap[tableId] = event
+}
+
+func getTableMap(tableId int)TableMapBinlogEvent{
+	defer tableMapLock.Unlock()
+	tableMapLock.Lock()
+	return tableMap[tableId]
+}
 
 // 事件体
 type BinlogEvent interface {
@@ -65,11 +79,10 @@ func ParseBinlogHeader(bs []byte) *BinlogHeader{
 	binlogHeader.TimeStamp = common.BytesToIntWithMin(bs[pos:pos + 4])
 	pos += 4
 	binlogHeader.TypeCode = bs[pos]
-	if binlogHeader.TypeCode > 30{
-		fmt.Println(common.BytesToStr(bs[:2048]))
-		fmt.Println("dfsfsd")
-	}
 	tools.Println("type code :%d",binlogHeader.TypeCode)
+	if binlogHeader.TypeCode == 30{
+		fmt.Println("type code = 30 packet length = %d",len(bs))
+	}
 	binlogHeader.ServerId = bs[pos:pos+4]
 	pos +=4
 	binlogHeader.EventLength = common.BytesToIntWithMin(bs[pos:pos+4])
@@ -127,7 +140,7 @@ func (this *RowBinlogEvent) ParseEvent(bs []byte){
 	}
 	// 每个recored 包含一个是否为空的bitset及
 	// 获取列信息
-	tableMapEvent,_ := tableMap[this.TableId]
+	tableMapEvent := getTableMap(this.TableId)
 	//if !ok{
 	//	return
 	//}
@@ -395,7 +408,7 @@ func (this *TableMapBinlogEvent)ParseEvent(bs []byte){
 	this.decodeMeta(metaData)
 	// 是否每列为空 可变长度 INT((N+7)/8) bytes：如 n=8 为1byte，n=9为2byte
 	// 将表数据类型存入缓存
-	tableMap[this.TableId] = *this
+	putTableMap(this.TableId,*this)
 }
 
 func (e *TableMapBinlogEvent) decodeMeta(data []byte) error {
