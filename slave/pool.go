@@ -3,7 +3,7 @@ package slave
 import (
 	"github.com/itgeniusshuai/mysql_slave/tools"
 	"time"
-	"github.com/golang/lint/testdata"
+	"fmt"
 )
 
 type Pool struct {
@@ -23,6 +23,8 @@ type Pool struct {
 	ServerId uint32
 	// 事件处理函数
 	DealFunc func(eventStruct BinlogEventStruct)
+	// 上次处理事件时间戳
+	LastEventTimestamp int
 
 }
 
@@ -44,13 +46,24 @@ func MakePool(poolSize uint8,host string,port int,user string,pwd string,serverI
 // 监听binlog
 func (this *Pool)ListenBinlogAndParse( dealEvent func(v BinlogEventStruct)){
 	this.DealFunc = dealEvent
+	// 过滤重复事件
+	var dealPoolEvent = func(v BinlogEventStruct){
+		currEventTimestamp := v.BinlogHeader.TimeStamp
+		if currEventTimestamp > this.LastEventTimestamp{
+			this.LastEventTimestamp = currEventTimestamp
+			dealEvent(v)
+		}else{
+			tools.Println("event has been dealed by other conn")
+		}
+	}
 	for _,conn := range this.Conns{
-		conn.StartBinlogDumpAndListen(dealEvent)
+		conn.StartBinlogDumpAndListen(dealPoolEvent)
 	}
 	// 开启池连接检测
 	go this.CheckPoolConn()
 }
 
+// 检测池连接并断了重新连接
 func (this *Pool)CheckPoolConn(){
 	tools.Println("check pool conn every second")
 	tick := time.NewTicker(1*time.Second)
