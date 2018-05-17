@@ -10,6 +10,7 @@ import (
 	"github.com/juju/errors"
 	"github.com/itgeniusshuai/mysql_slave/tools"
 	"os"
+	"time"
 )
 
 type MysqlConnection struct{
@@ -21,6 +22,8 @@ type MysqlConnection struct{
 	Port int
 	seqLock sync.RWMutex
 	ServerId uint32
+
+	LastReceivedTime time.Time
 }
 
 var buffer []byte = make([]byte,1024)
