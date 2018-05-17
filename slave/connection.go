@@ -23,6 +23,7 @@ type MysqlConnection struct{
 	seqLock sync.RWMutex
 	ServerId uint32
 
+	// 用于检测
 	LastReceivedTime time.Time
 }
 
@@ -269,6 +270,7 @@ func (this *MysqlConnection)ListenBinlog(){
 			tools.Println("parse nothing don't send to chan")
 			continue
 		}
+		this.LastReceivedTime = time.Now()
 		tools.Println("send BinlogEvent to chan")
 		BinlogChan <- *binlogEvent
 	}
@@ -282,9 +284,9 @@ func (this *MysqlConnection)RegisterSlave() error{
 	if e != nil{
 		return e
 	}
-	// 心跳周期
+	// 心跳周期2s
 	tools.Println("set heartbeat period")
-	//this.Execute(`SET @master_heartbeat_period=1;`)
+	this.Execute(`SET @master_heartbeat_period=2;`)
 	if (e != nil){
 		return e
 	}
@@ -301,11 +303,11 @@ func (this *MysqlConnection)RegisterSlave() error{
 
 
 	// 半同步复制
-	//tools.Println("start semi sync")
-	//this.Execute(`SET @rpl_semi_sync_slave = 1;`)
-	//if (e != nil){
-	//	return e
-	//}
+	tools.Println("start semi sync")
+	this.Execute(`SET @rpl_semi_sync_slave = 1;`)
+	if (e != nil){
+		return e
+	}
 	return nil
 }
 
@@ -437,6 +439,10 @@ func (this *MysqlConnection)ReadOkResult() bool{
 	}
 	tools.Println("it is not a ok result,result is "+common.BytesToStr(res[4:]))
 	return false
+}
+
+func (this *MysqlConnection)Close(){
+	this.Conn.Close()
 }
 
 
