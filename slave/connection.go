@@ -324,11 +324,9 @@ func (this *MysqlConnection)RegisterSlave() error{
 	if !isOk{
 		return errors.New("register slave faild")
 	}
-
-
 	// 半同步复制
 	tools.Println("start semi sync")
-	this.Execute(`SET @rpl_semi_sync_slave = 1;`)
+	e = this.Execute(`SET @rpl_semi_sync_slave = 1;`)
 	if (e != nil){
 		return e
 	}

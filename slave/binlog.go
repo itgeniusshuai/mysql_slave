@@ -143,9 +143,6 @@ func (this *RowBinlogEvent) ParseEvent(bs []byte){
 	tableMapEvent := getTableMap(this.TableId)
 	this.DbName = tableMapEvent.DbName
 	this.TableName = tableMapEvent.TableName
-	//if !ok{
-	//	return
-	//}
 	for pos < len(bs)-24 {
 		n,_= this.decodeRows(bs[pos:], &tableMapEvent, this.FieldIsUsed)
 		pos += n
