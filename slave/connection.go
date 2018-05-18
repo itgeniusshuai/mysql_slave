@@ -12,6 +12,7 @@ import (
 	"os"
 	"time"
 	"io"
+	"github.com/satori/go.uuid"
 )
 
 type MysqlConnection struct{
@@ -26,13 +27,16 @@ type MysqlConnection struct{
 
 	// 用于检测
 	LastReceivedTime time.Time
+	// 连接唯一标示
+	id string
 }
 
 var buffer []byte = make([]byte,1024)
 var sizeBuffer []byte = make([]byte,3)
 
 func GetMysqlConnection(host string, port int, user string, pwd string,serverId uint32)(*MysqlConnection){
-	myConn := MysqlConnection{Host:host,User:user,Pwd:pwd,Port:port,ServerId:serverId}
+	id,_ := uuid.NewV4()
+	myConn := MysqlConnection{Host:host,User:user,Pwd:pwd,Port:port,ServerId:serverId,id:id.String()}
 	// 连接mysql
 	err := myConn.ConnectMysql()
 	if err != nil{
@@ -259,6 +263,7 @@ func (this *MysqlConnection) StartBinlogDumpAndListen(dealBinlogFunc func(binlog
 		for {
 			select {
 			case v := <-BinlogChan:
+				tools.Println("type code [%d] conn id [%s] header pos",v.BinlogHeader.TypeCode,this.id,v.BinlogHeader.TimeStamp)
 				dealBinlogFunc(v)
 			}
 		}
@@ -277,7 +282,7 @@ func (this *MysqlConnection)ListenBinlog(){
 		if bs == nil{
 			continue
 		}
-		if len(bs) < 4{
+		if len(bs) < 5{
 			continue
 		}
 		if bs[4] != 0{

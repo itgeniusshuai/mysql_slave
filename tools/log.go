@@ -3,9 +3,9 @@ package tools
 import "fmt"
 
 func Print(format string,strs ...interface{}){
-	fmt.Print(fmt.Sprintf(format,strs))
+	fmt.Print(fmt.Sprintf(format,strs...))
 }
 
 func Println(format string,strs ...interface{}){
-	fmt.Println(fmt.Sprintf(format,strs))
+	fmt.Println(fmt.Sprintf(format,strs...))
 }
