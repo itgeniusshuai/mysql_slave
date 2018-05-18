@@ -65,6 +65,8 @@ type BinlogHeader struct{
 	NextPosition int
 	Flags []byte
 	ExtraHeaders []byte
+
+	Id int
 }
 
 // 解析事件头每个事件都一样
@@ -79,10 +81,6 @@ func ParseBinlogHeader(bs []byte) *BinlogHeader{
 	binlogHeader.TimeStamp = common.BytesToIntWithMin(bs[pos:pos + 4])
 	pos += 4
 	binlogHeader.TypeCode = bs[pos]
-	tools.Println("type code :%d",binlogHeader.TypeCode)
-	if binlogHeader.TypeCode == 30{
-		fmt.Println("type code = 30 packet length = %d",len(bs))
-	}
 	binlogHeader.ServerId = bs[pos:pos+4]
 	pos +=4
 	binlogHeader.EventLength = common.BytesToIntWithMin(bs[pos:pos+4])
@@ -93,6 +91,8 @@ func ParseBinlogHeader(bs []byte) *BinlogHeader{
 	if binlogHeader.EventLength < size{
 		return nil
 	}
+	// 封装id，不同连接的一个消息要相同，并且有递增顺序
+	binlogHeader.Id = (binlogHeader.TimeStamp << 2) | int(bs[3])
 	return &binlogHeader
 }
 
@@ -141,6 +141,8 @@ func (this *RowBinlogEvent) ParseEvent(bs []byte){
 	// 每个recored 包含一个是否为空的bitset及
 	// 获取列信息
 	tableMapEvent := getTableMap(this.TableId)
+	this.DbName = tableMapEvent.DbName
+	this.TableName = tableMapEvent.TableName
 	//if !ok{
 	//	return
 	//}

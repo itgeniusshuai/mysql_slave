@@ -23,7 +23,7 @@ type Pool struct {
 	// 事件处理函数
 	DealFunc func(eventStruct BinlogEventStruct)
 	// 上次处理事件时间戳
-	LastEventTimestamp int
+	LastEventId int
 
 }
 
@@ -47,9 +47,9 @@ func (this *Pool)ListenBinlogAndParse( dealEvent func(v BinlogEventStruct)){
 	this.DealFunc = dealEvent
 	// 过滤重复事件
 	var dealPoolEvent = func(v BinlogEventStruct){
-		currEventTimestamp := v.BinlogHeader.TimeStamp
-		if currEventTimestamp > this.LastEventTimestamp{
-			this.LastEventTimestamp = currEventTimestamp
+		currEventId := v.BinlogHeader.Id
+		if currEventId > this.LastEventId{
+			this.LastEventId = currEventId
 			dealEvent(v)
 		}else{
 			tools.Println("event has been dealed by other conn")
