@@ -59,7 +59,7 @@ func (this *Pool)ListenBinlogAndParse( dealEvent func(v BinlogEventStruct)){
 		conn.StartBinlogDumpAndListen(dealPoolEvent)
 	}
 	// 开启池连接检测
-	//go this.CheckPoolConn()
+	go this.CheckPoolConn()
 }
 
 // 检测池连接并断了重新连接
@@ -67,9 +67,9 @@ func (this *Pool)CheckPoolConn(){
 	tools.Println("check pool conn every second")
 	tick := time.NewTicker(1*time.Second)
 	for _ = range tick.C {
-		var now= time.Now().Nanosecond()
+		var now= time.Now().Second()
 		for i, conn := range this.Conns {
-			if conn.LastReceivedTime.Nanosecond()+10 < now {
+			if conn.LastReceivedTime.Second()+10 < now {
 				conn = GetMysqlConnection(this.Host, this.Port, this.User, this.Pwd, this.ServerId)
 				this.Conns[i] = conn
 				conn.StartBinlogDumpAndListen(this.DealFunc)
