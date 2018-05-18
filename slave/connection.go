@@ -288,13 +288,13 @@ func (this *MysqlConnection)ListenBinlog(){
 		if bs[4] != 0{
 			continue
 		}
+		this.LastReceivedTime = time.Now()
 		tools.Println("parse []byte to BinlogEvent")
-		binlogEvent := ParseEvent(bs)
+		binlogEvent := ParseEvent(bs,this)
 		if binlogEvent == nil{
 			tools.Println("parse nothing don't send to chan")
 			continue
 		}
-		this.LastReceivedTime = time.Now()
 		tools.Println("send BinlogEvent to chan")
 		BinlogChan <- *binlogEvent
 	}
@@ -310,7 +310,7 @@ func (this *MysqlConnection)RegisterSlave() error{
 	}
 	// 心跳周期2s
 	tools.Println("set heartbeat period")
-	this.Execute(`SET @master_heartbeat_period=2;`)
+	//this.Execute(`SET @master_heartbeat_period=2;`)
 	if (e != nil){
 		return e
 	}

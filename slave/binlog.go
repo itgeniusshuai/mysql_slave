@@ -14,10 +14,13 @@ import (
 	"unsafe"
 	"github.com/itgeniusshuai/mysql_slave/tools"
 	"sync"
+	"unicode"
 )
 
 var tableMap = make(map[int]TableMapBinlogEvent,0)
 var tableMapLock = sync.Mutex{}
+var connFormat = make(map[string]byte,0)
+var formatDescLock = sync.Mutex{}
 
 func putTableMap(tableId int, event TableMapBinlogEvent){
 	defer tableMapLock.Unlock()
@@ -29,6 +32,23 @@ func getTableMap(tableId int)TableMapBinlogEvent{
 	defer tableMapLock.Unlock()
 	tableMapLock.Lock()
 	return tableMap[tableId]
+}
+
+func putConnFormatMap(connId string, checkNum byte){
+	defer formatDescLock.Unlock()
+	formatDescLock.Lock()
+	connFormat[connId] = checkNum
+}
+
+func getConnFormatMap(connId string)byte{
+	defer formatDescLock.Unlock()
+	formatDescLock.Lock()
+	return connFormat[connId]
+}
+func removeConnFormatMap(connId string){
+	defer formatDescLock.Unlock()
+	formatDescLock.Lock()
+	delete(connFormat, connId)
 }
 
 // 事件体
@@ -54,6 +74,8 @@ type RowBinlogEvent struct {
 	ColumnNames []interface{}
 	Pos uint
 	RowDatas [][]interface{}
+
+	ConnId string
 }
 
 // 事件头
@@ -97,7 +119,7 @@ func ParseBinlogHeader(bs []byte) *BinlogHeader{
 }
 
 // 解析事件（包含头和体）
-func ParseEvent(bs []byte) *BinlogEventStruct{
+func ParseEvent(bs []byte,conn *MysqlConnection) *BinlogEventStruct{
 	//tools.Println("received event %s",common.BytesToStr(bs))
 	binlogEventStruct := BinlogEventStruct{}
 	header := ParseBinlogHeader(bs)
@@ -112,6 +134,9 @@ func ParseEvent(bs []byte) *BinlogEventStruct{
 		binlogEvent = &RowBinlogEvent{TypeCode:header.TypeCode}
 	case TABLE_MAP_EVENT:
 		binlogEvent = &TableMapBinlogEvent{}
+	case FORMAT_DESCRIPTION_EVENT:
+		// 第一个binlog事件
+		binlogEvent = &FormatDescEvent{}
 	default:
 		return nil
 	}
@@ -143,7 +168,10 @@ func (this *RowBinlogEvent) ParseEvent(bs []byte){
 	tableMapEvent := getTableMap(this.TableId)
 	this.DbName = tableMapEvent.DbName
 	this.TableName = tableMapEvent.TableName
-	for pos < len(bs)-24 {
+	if getConnFormatMap(this.ConnId) == BINLOG_CHECKSUM_ALG_CRC32{
+		bs = bs[:len(bs)-4]
+	}
+	for pos < len(bs){
 		n,_= this.decodeRows(bs[pos:], &tableMapEvent, this.FieldIsUsed)
 		pos += n
 
@@ -905,6 +933,84 @@ func String(b []byte) (s string) {
 	return
 }
 
+type FormatDescEvent struct {
+	Version uint16
+	//len = 50
+	ServerVersion          []byte
+	CreateTimestamp        uint32
+	EventHeaderLength      uint8
+	EventTypeHeaderLengths []byte
 
+	// 0 is off, 1 is for CRC32, 255 is undefined
+	ChecksumAlgorithm byte
+	ConnId string
+}
+var(
+	checksumVersionSplitMysql   []int = []int{5, 6, 1}
+	checksumVersionProductMysql int   = (checksumVersionSplitMysql[0]*256+checksumVersionSplitMysql[1])*256 + checksumVersionSplitMysql[2]
+)
+
+func (e *FormatDescEvent)ParseEvent(bs []byte){
+	pos := 19 + 4 + 1
+	e.Version = binary.LittleEndian.Uint16(bs[pos:])
+	pos += 2
+
+	e.ServerVersion = make([]byte, 50)
+	copy(e.ServerVersion, bs[pos:])
+	pos += 50
+
+	e.CreateTimestamp = binary.LittleEndian.Uint32(bs[pos:])
+	pos += 4
+
+	e.EventHeaderLength = bs[pos]
+	pos++
+
+	//if e.EventHeaderLength != byte(EventHeaderSize) {
+	//	return errors.Errorf("invalid event header length %d, must 19", e.EventHeaderLength)
+	//}
+
+	server := string(e.ServerVersion)
+	checksumProduct := checksumVersionProductMysql
+
+	if calcVersionProduct(server) >= checksumProduct {
+		// here, the last 5 bytes is 1 byte check sum alg type and 4 byte checksum if exists
+		e.ChecksumAlgorithm = bs[len(bs)-5]
+		e.EventTypeHeaderLengths = bs[pos : len(bs)-5]
+	} else {
+		e.ChecksumAlgorithm = BINLOG_CHECKSUM_ALG_UNDEF
+		e.EventTypeHeaderLengths = bs[pos:]
+	}
+	tools.Println("algorithm %d",e.ChecksumAlgorithm)
+	putConnFormatMap(e.ConnId,e.ChecksumAlgorithm)
+
+}
+
+func calcVersionProduct(server string) int {
+	versionSplit := splitServerVersion(server)
+
+	return ((versionSplit[0]*256+versionSplit[1])*256 + versionSplit[2])
+}
+
+func splitServerVersion(server string) []int {
+	seps := strings.Split(server, ".")
+	if len(seps) < 3 {
+		return []int{0, 0, 0}
+	}
+
+	x, _ := strconv.Atoi(seps[0])
+	y, _ := strconv.Atoi(seps[1])
+
+	index := 0
+	for i, c := range seps[2] {
+		if !unicode.IsNumber(c) {
+			index = i
+			break
+		}
+	}
+
+	z, _ := strconv.Atoi(seps[2][0:index])
+
+	return []int{x, y, z}
+}
 
 
