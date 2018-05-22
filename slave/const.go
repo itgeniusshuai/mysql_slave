@@ -125,3 +125,10 @@ const (
 	BINLOG_CHECKSUM_ALG_UNDEF byte = 255 // special value to tag undetermined yet checksum
 	// or events from checksum-unaware servers
 )
+
+type EventType byte
+const(
+	BINLOG_UPDATE = 0x00
+	BINLOG_DELETE = 0x01
+	BINLOG_WRITE = 0x02
+)

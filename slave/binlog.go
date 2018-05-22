@@ -76,6 +76,7 @@ type RowBinlogEvent struct {
 	RowDatas [][]interface{}
 
 	ConnId string
+	EventType EventType
 }
 
 // 事件头
@@ -130,8 +131,12 @@ func ParseEvent(bs []byte,conn *MysqlConnection) *BinlogEventStruct{
 	var binlogEvent BinlogEvent
 	// 只解析增删改查的行事件
 	switch header.TypeCode {
-	case WRITE_ROWS_EVENT,WRITE_ROWS_EVENT_V1,UPDATE_ROWS_EVENT,UPDATE_ROWS_EVENT_V1,DELETE_ROWS_EVENT,DELETE_ROWS_EVENT_V1:
-		binlogEvent = &RowBinlogEvent{TypeCode:header.TypeCode}
+	case WRITE_ROWS_EVENT,WRITE_ROWS_EVENT_V1:
+		binlogEvent = &RowBinlogEvent{TypeCode:header.TypeCode,EventType:BINLOG_WRITE}
+	case UPDATE_ROWS_EVENT,UPDATE_ROWS_EVENT_V1:
+		binlogEvent = &RowBinlogEvent{TypeCode:header.TypeCode,EventType:BINLOG_UPDATE}
+	case DELETE_ROWS_EVENT,DELETE_ROWS_EVENT_V1:
+		binlogEvent = &RowBinlogEvent{TypeCode:header.TypeCode,EventType:BINLOG_DELETE}
 	case TABLE_MAP_EVENT:
 		binlogEvent = &TableMapBinlogEvent{}
 	case FORMAT_DESCRIPTION_EVENT:
