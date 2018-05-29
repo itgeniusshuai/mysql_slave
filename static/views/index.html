@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Mysql Slave</title>
+    <style type="text/css" charset="UTF-8">
+    container{
+        width: 100%;
+        height: 100%;
+    }
+    .title{
+        width:100%;
+        height:10%;
+        text-align: center;
+    }
+    .power{
+        position: absolute;
+        /*left: 50%;*/
+        top: 50%;
+        /*margin-left: -*/
+        margin-top: -270px;
+        width:100%;
+        height:80%;
+        text-align: center;
+    }
+</style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="title">Welcome to Mysql Slave</h1>
+    <!-- 为ECharts准备一个具备大小（宽高）的Dom -->
+        <div class="power" id="power" ></div>
+    </div>
+</div>
+<script src="static/js/echarts.min.js" charset="utf-8"></script>
+<script src="../js/echarts.min.js" charset="utf-8"></script>
+<script type="text/javascript">
+    // 基于准备好的dom，初始化echarts实例
+    var myChart = echarts.init(document.getElementById('power'));
+
+    option = {
+        // title: {
+        //     text: '应用特性'
+        // },
+        tooltip: {},
+        // legend: {
+        //     data: ['应用特性']
+        // },
+        radar: {
+            // shape: 'circle',
+            name: {
+                textStyle: {
+                    color: '#fff',
+                    backgroundColor: '#999',
+                    borderRadius: 3,
+                    padding: [3, 5]
+                }
+            },
+            splitNumber:3,
+            indicator: [
+                { name: '延时', max: 10},
+                { name: '增量', max: 10},
+                { name: '稳定', max: 10},
+                { name: '连接池', max: 10},
+                { name: '易用', max: 10},
+            ]
+        },
+        series: [{
+            name: '预算 vs 开销（Budget vs spending）',
+            type: 'radar',
+            // areaStyle: {normal: {}},
+            data : [
+                {
+                    itemStyle: {
+                        normal: {
+                            color: '#F9713C'
+                        }
+                    },
+                    value : [7, 10, 9, 10,9],
+                    name : '应用特性'
+                }
+            ]
+        }]
+    };
+
+    // 使用刚指定的配置项和数据显示图表。
+    myChart.setOption(option);
+</script>
+
+
+
+</body>
+</html>

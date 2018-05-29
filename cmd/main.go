@@ -4,12 +4,24 @@ import (
 	"github.com/itgeniusshuai/mysql_slave/slave"
 	"fmt"
 	"github.com/itgeniusshuai/mysql_slave/tools"
+	"github.com/kataras/iris"
+	"github.com/itgeniusshuai/mysql_slave/controllers"
 )
 
 var Semaphore = make(chan int,1)
 
 func main(){
-	mainFunc("127.0.0.1",3306,"root","root",1)
+	//mainFunc("127.0.0.1",3306,"root","",1)
+
+	// web
+	app := iris.New()
+	app.RegisterView(iris.HTML("./static/views", ".html"))
+	app.StaticWeb("/static/js","./static/js")
+
+	// 首页
+	app.Get("/", controllers.Index)
+
+	app.Run(iris.Addr(":8080"))
 	select{
 	case <-Semaphore:
 		fmt.Println("exit")
@@ -32,3 +44,4 @@ func dealBinlogEvent(eventStruct slave.BinlogEventStruct){
 		tools.Println("Other event type don't deal")
 	}
 }
+
