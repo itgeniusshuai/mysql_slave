@@ -85,6 +85,13 @@ func (this *MysqlConnection)ReadServerData()([]byte,error){
 	io.CopyN(&byteBuff,this.Conn,pkLen+1)
 	bs = append(bs, byteBuff.Bytes()...)
 	this.SetMsgSeq(bs[3]+1)
+
+	if(pkLen == 0xfffff){
+		bs1,_ := this.ReadServerData()
+		if(bs1 != nil && len(bs1)>0){
+			bs = append(bs, bs1...)
+		}
+	}
 	return bs,nil
 }
 // 发生粘包
