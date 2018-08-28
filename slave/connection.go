@@ -81,6 +81,9 @@ func (this *MysqlConnection)ReadServerData()([]byte,error){
 	}
 	bs = append(bs, sizeBuffer...)
 	pkLen := common.BytesToInt64WithMin(bs)
+	if pkLen == 0{
+		return bs,nil
+	}
 	// 分包
 	io.CopyN(&byteBuff,this.Conn,pkLen+1)
 	bs = append(bs, byteBuff.Bytes()...)
@@ -89,7 +92,7 @@ func (this *MysqlConnection)ReadServerData()([]byte,error){
 	if(pkLen == 0xfffff){
 		bs1,_ := this.ReadServerData()
 		if(bs1 != nil && len(bs1)>0){
-			bs = append(bs, bs1...)
+			bs = append(bs, bs1[1:]...)
 		}
 	}
 	return bs,nil
