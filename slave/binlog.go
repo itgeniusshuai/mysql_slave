@@ -15,12 +15,21 @@ import (
 	"github.com/itgeniusshuai/mysql_slave/tools"
 	"sync"
 	"unicode"
+	_ "github.com/go-sql-driver/mysql"
+	"database/sql"
+	"log"
 )
 
 var tableMap = make(map[int]TableMapBinlogEvent,0)
 var tableMapLock = sync.Mutex{}
 var connFormat = make(map[string]byte,0)
 var formatDescLock = sync.Mutex{}
+
+type TableMete struct {
+	ColumnNames []string
+	ColumnTypes []string
+	PkColumns []string
+}
 
 func putTableMap(tableId int, event TableMapBinlogEvent){
 	defer tableMapLock.Unlock()
@@ -71,12 +80,13 @@ type RowBinlogEvent struct {
 	FieldUpdateUsed []byte // only update have
 	DbName string
 	TableName string
-	ColumnNames []interface{}
+	TableMete *TableMete
 	Pos uint
 	RowDatas [][]interface{}
 
 	ConnId string
 	EventType EventType
+	Conn *MysqlConnection
 }
 
 // 事件头
@@ -132,11 +142,11 @@ func ParseEvent(bs []byte,conn *MysqlConnection) *BinlogEventStruct{
 	// 只解析增删改查的行事件
 	switch header.TypeCode {
 	case WRITE_ROWS_EVENT,WRITE_ROWS_EVENT_V1:
-		binlogEvent = &RowBinlogEvent{TypeCode:header.TypeCode,EventType:BINLOG_WRITE}
+		binlogEvent = &RowBinlogEvent{TypeCode:header.TypeCode,EventType:BINLOG_WRITE,Conn:conn}
 	case UPDATE_ROWS_EVENT,UPDATE_ROWS_EVENT_V1:
-		binlogEvent = &RowBinlogEvent{TypeCode:header.TypeCode,EventType:BINLOG_UPDATE}
+		binlogEvent = &RowBinlogEvent{TypeCode:header.TypeCode,EventType:BINLOG_UPDATE,Conn:conn}
 	case DELETE_ROWS_EVENT,DELETE_ROWS_EVENT_V1:
-		binlogEvent = &RowBinlogEvent{TypeCode:header.TypeCode,EventType:BINLOG_DELETE}
+		binlogEvent = &RowBinlogEvent{TypeCode:header.TypeCode,EventType:BINLOG_DELETE,Conn:conn}
 	case TABLE_MAP_EVENT:
 		binlogEvent = &TableMapBinlogEvent{}
 	case FORMAT_DESCRIPTION_EVENT:
@@ -186,6 +196,61 @@ func (this *RowBinlogEvent) ParseEvent(bs []byte){
 		}
 	}
 
+	// 获取表字段
+	this.TableMete = this.Conn.GetColumns(this.DbName,this.TableName)
+
+}
+
+func (this *MysqlConnection)GetColumns(dbName string,tableName string)*TableMete{
+	dateSourceName := this.User+":"+this.Pwd+"@tcp("+this.Host+":"+common.IntToStr(this.Port)+")/"
+	db,_ :=sql.Open("mysql", dateSourceName)
+	defer db.Close()
+	r, err := db.Query(fmt.Sprintf("show full columns from `%s`.`%s`", dbName,tableName))
+	if(err != nil){
+		fmt.Print(err)
+	}
+	//columnNames := make([]string,0)
+	columns,_ := r.Columns()
+	values := make([]sql.RawBytes, len(columns))
+	scanArgs := make([]interface{}, len(values))
+	columnNames := make([]string,0)
+	columnTypes := make([]string,0)
+	pkColumns := make([]string,0)
+	for i := range values {
+		scanArgs[i] = &values[i]
+	}
+	for r.Next() {
+		err = r.Scan(scanArgs...)
+		if err != nil {
+			log.Fatal(err)
+		}
+		var value string
+		for k, col := range values {
+			if col == nil {
+				value = "NULL"
+			} else {
+				value = string(col)
+			}
+			if k == 0{
+				columnNames = append(columnNames, value)
+			}
+			if k == 1{
+				columnTypes = append(columnTypes, value)
+			}
+			if k == 4{
+				if value == "PRI" {
+					pkColumns = append(pkColumns, columnNames[len(columnNames)-1])
+				}
+			}
+		}
+
+	}
+	tableMete := new(TableMete)
+	tableMete.ColumnNames = columnNames
+	tableMete.ColumnTypes = columnTypes
+	tableMete.PkColumns = pkColumns
+
+	return tableMete
 }
 
 func (e *RowBinlogEvent) decodeRows(data []byte, table *TableMapBinlogEvent, bitmap []byte) (int, error) {
