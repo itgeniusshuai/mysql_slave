@@ -209,6 +209,7 @@ func (this *MysqlConnection)GetColumns(dbName string,tableName string)*TableMete
 	r, err := db.Query(fmt.Sprintf("show full columns from `%s`.`%s`", dbName,tableName))
 	if(err != nil){
 		fmt.Print(err)
+		return nil
 	}
 	//columnNames := make([]string,0)
 	columns,_ := r.Columns()
