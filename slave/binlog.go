@@ -29,6 +29,7 @@ type TableMete struct {
 	ColumnNames []string
 	ColumnTypes []string
 	PkColumns []string
+	PkColumnIndexes []int
 }
 
 func putTableMap(tableId int, event TableMapBinlogEvent){
@@ -216,6 +217,7 @@ func (this *MysqlConnection)GetColumns(dbName string,tableName string)*TableMete
 	columnNames := make([]string,0)
 	columnTypes := make([]string,0)
 	pkColumns := make([]string,0)
+	pkColumnIndexes := make([]int,0)
 	for i := range values {
 		scanArgs[i] = &values[i]
 	}
@@ -240,6 +242,7 @@ func (this *MysqlConnection)GetColumns(dbName string,tableName string)*TableMete
 			if k == 4{
 				if value == "PRI" {
 					pkColumns = append(pkColumns, columnNames[len(columnNames)-1])
+					pkColumnIndexes = append(pkColumnIndexes, len(columnNames)-1)
 				}
 			}
 		}
