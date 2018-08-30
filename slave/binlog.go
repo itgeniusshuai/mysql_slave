@@ -125,8 +125,8 @@ func ParseBinlogHeader(bs []byte) *BinlogHeader{
 	if binlogHeader.EventLength < size{
 		return nil
 	}
-	// 封装id，不同连接的一个消息要相同，并且有递增顺序
-	binlogHeader.Id = (binlogHeader.TimeStamp << 2) | int(bs[3])
+	// 封装id，不同连接的一个消息要相同，并且有递增顺序 bs[3]就是递增序号
+	binlogHeader.Id = (binlogHeader.TimeStamp << 8) | int(bs[3])
 	return &binlogHeader
 }
 
