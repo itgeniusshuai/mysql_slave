@@ -13,6 +13,7 @@ import (
 	"time"
 	"io"
 	"github.com/satori/go.uuid"
+	"fmt"
 )
 
 type MysqlConnection struct{
@@ -474,6 +475,12 @@ func (this *MysqlConnection)ReadOkResult() bool{
 }
 
 func (this *MysqlConnection)Close(){
+	defer func() {
+		if r := recover(); r != nil {
+			// 这里可以对异常进行一些处理和捕获
+			fmt.Println("Recovered Close Conn:", r)
+		}
+	}()
 	this.Conn.Close()
 }
 
