@@ -253,6 +253,7 @@ func (this *MysqlConnection)GetColumns(dbName string,tableName string)*TableMete
 	tableMete.ColumnNames = columnNames
 	tableMete.ColumnTypes = columnTypes
 	tableMete.PkColumns = pkColumns
+	tableMete.PkColumnIndexes = pkColumnIndexes
 
 	return tableMete
 }
