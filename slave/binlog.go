@@ -63,7 +63,7 @@ func removeConnFormatMap(connId string){
 
 // 事件体
 type BinlogEvent interface {
-	ParseEvent(bs []byte)
+	ParseEvent(bs []byte) bool
 }
 
 // 包含头和体
@@ -156,13 +156,16 @@ func ParseEvent(bs []byte,conn *MysqlConnection) *BinlogEventStruct{
 	default:
 		return nil
 	}
-	binlogEvent.ParseEvent(bs)
+	flag := binlogEvent.ParseEvent(bs)
+	if(!flag){
+		return nil
+	}
 	binlogEventStruct.BinlogEvent = binlogEvent
 	return &binlogEventStruct
 }
 
 // 具体事件的解析实现
-func (this *RowBinlogEvent) ParseEvent(bs []byte){
+func (this *RowBinlogEvent) ParseEvent(bs []byte) bool{
 	pos := 19 + 4 + 1
 	this.TableId = common.BytesToIntWithMin(bs[pos:pos+6])
 	pos += 6 + 2 // 2 bytes Reserved for future use.
@@ -198,14 +201,42 @@ func (this *RowBinlogEvent) ParseEvent(bs []byte){
 	}
 
 	// 获取表字段
-	this.TableMete = this.Conn.GetColumns(this.DbName,this.TableName)
+	if(this.DbName == "yxp_cp"){
+		this.TableMete = this.Conn.GetColumns(this.DbName,this.TableName)
+		return true;
+	}
+	return false;
 
 }
 
+func (this *MysqlConnection) GetMasterStatus()uint32{
+	db := this.GetConn()
+	r,err := db.Query("show master status")
+	if(err != nil){
+		fmt.Println(err)
+	}
+	var file string
+	var position uint32
+	var db1 string
+	var ignoreDb string
+	var gidset string
+	if r.Next(){
+		r.Scan(&file,&position,&db1,&ignoreDb,&gidset)
+	}
+	return position
+}
+
+func (this *MysqlConnection) GetConn()*sql.DB{
+	if(this.Db == nil){
+		dateSourceName := this.User+":"+this.Pwd+"@tcp("+this.Host+":"+common.IntToStr(this.Port)+")/"
+		db,_ :=sql.Open("mysql", dateSourceName)
+		this.Db = db
+	}
+	return this.Db
+}
+
 func (this *MysqlConnection)GetColumns(dbName string,tableName string)*TableMete{
-	dateSourceName := this.User+":"+this.Pwd+"@tcp("+this.Host+":"+common.IntToStr(this.Port)+")/"
-	db,_ :=sql.Open("mysql", dateSourceName)
-	defer db.Close()
+	db := this.GetConn()
 	r, err := db.Query(fmt.Sprintf("show full columns from `%s`.`%s`", dbName,tableName))
 	if(err != nil){
 		fmt.Print(err)
@@ -477,7 +508,7 @@ type TableMapBinlogEvent struct {
 
 }
 
-func (this *TableMapBinlogEvent)ParseEvent(bs []byte){
+func (this *TableMapBinlogEvent)ParseEvent(bs []byte)bool{
 	pos := 19 + 4 + 1
 	this.TableId = common.BytesToIntWithMin(bs[pos:pos+6])
 	pos += 6 + 2 // 2 bytes Reserved for future use.
@@ -511,6 +542,7 @@ func (this *TableMapBinlogEvent)ParseEvent(bs []byte){
 	// 是否每列为空 可变长度 INT((N+7)/8) bytes：如 n=8 为1byte，n=9为2byte
 	// 将表数据类型存入缓存
 	putTableMap(this.TableId,*this)
+	return false;
 }
 
 func (e *TableMapBinlogEvent) decodeMeta(data []byte) error {
@@ -1025,7 +1057,7 @@ var(
 	checksumVersionProductMysql int   = (checksumVersionSplitMysql[0]*256+checksumVersionSplitMysql[1])*256 + checksumVersionSplitMysql[2]
 )
 
-func (e *FormatDescEvent)ParseEvent(bs []byte){
+func (e *FormatDescEvent)ParseEvent(bs []byte) bool{
 	pos := 19 + 4 + 1
 	e.Version = binary.LittleEndian.Uint16(bs[pos:])
 	pos += 2
@@ -1057,6 +1089,7 @@ func (e *FormatDescEvent)ParseEvent(bs []byte){
 	}
 	tools.Println("algorithm %d",e.ChecksumAlgorithm)
 	putConnFormatMap(e.ConnId,e.ChecksumAlgorithm)
+	return false;
 
 }
 

@@ -14,6 +14,8 @@ import (
 	"io"
 	"github.com/satori/go.uuid"
 	"fmt"
+	_ "github.com/go-sql-driver/mysql"
+	"database/sql"
 )
 
 type MysqlConnection struct{
@@ -30,6 +32,7 @@ type MysqlConnection struct{
 	LastReceivedTime time.Time
 	// 连接唯一标示
 	id string
+	Db *sql.DB
 }
 
 var buffer []byte = make([]byte,1024)
@@ -409,7 +412,7 @@ func (this *MysqlConnection)WriteBinLogDumpPacket() error{
 	data[pos] = COM_BINLOG_DUMP
 	pos++
 
-	binary.LittleEndian.PutUint32(data[pos:], 4)
+	binary.LittleEndian.PutUint32(data[pos:], this.GetMasterStatus())
 	pos += 4
 
 	binary.LittleEndian.PutUint16(data[pos:], BINLOG_DUMP_NEVER_STOP)
