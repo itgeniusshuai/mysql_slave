@@ -22,6 +22,8 @@ import (
 
 var tableMap = make(map[int]TableMapBinlogEvent,0)
 var tableMapLock = sync.Mutex{}
+var tableMateMap = make(map[string]TableMete,0)
+var tableMateMapLock = sync.Mutex{}
 var connFormat = make(map[string]byte,0)
 var formatDescLock = sync.Mutex{}
 
@@ -30,6 +32,11 @@ type TableMete struct {
 	ColumnTypes []string
 	PkColumns []string
 	PkColumnIndexes []int
+}
+
+type Position struct{
+	Name string
+	Pos uint32
 }
 
 func putTableMap(tableId int, event TableMapBinlogEvent){
@@ -42,6 +49,18 @@ func getTableMap(tableId int)TableMapBinlogEvent{
 	defer tableMapLock.Unlock()
 	tableMapLock.Lock()
 	return tableMap[tableId]
+}
+
+func putTableMateMap(key string, tableMate TableMete){
+	defer tableMateMapLock.Unlock()
+	tableMateMapLock.Lock()
+	tableMateMap[key] = tableMate
+}
+
+func getTableMateMap(key string)TableMete{
+	defer tableMateMapLock.Unlock()
+	tableMateMapLock.Lock()
+	return tableMateMap[key]
 }
 
 func putConnFormatMap(connId string, checkNum byte){
@@ -201,15 +220,12 @@ func (this *RowBinlogEvent) ParseEvent(bs []byte) bool{
 	}
 
 	// 获取表字段
-	if(this.DbName == "yxp_cp"){
-		this.TableMete = this.Conn.GetColumns(this.DbName,this.TableName)
-		return true;
-	}
-	return false;
+	this.TableMete = this.Conn.GetColumns(this.DbName,this.TableName)
+	return true;
 
 }
 
-func (this *MysqlConnection) GetMasterStatus()uint32{
+func (this *MysqlConnection) GetMasterStatus()*Position{
 	db := this.GetConn()
 	r,err := db.Query("show master status")
 	if(err != nil){
@@ -223,7 +239,8 @@ func (this *MysqlConnection) GetMasterStatus()uint32{
 	if r.Next(){
 		r.Scan(&file,&position,&db1,&ignoreDb,&gidset)
 	}
-	return position
+	pos := Position{Name:file,Pos:position}
+	return &pos
 }
 
 func (this *MysqlConnection) GetConn()*sql.DB{
@@ -236,6 +253,11 @@ func (this *MysqlConnection) GetConn()*sql.DB{
 }
 
 func (this *MysqlConnection)GetColumns(dbName string,tableName string)*TableMete{
+	key := dbName+"_"+tableName
+	tableMate := getTableMateMap(key)
+	if &tableMate != nil{
+		return &tableMate
+	}
 	db := this.GetConn()
 	r, err := db.Query(fmt.Sprintf("show full columns from `%s`.`%s`", dbName,tableName))
 	if(err != nil){
@@ -286,6 +308,7 @@ func (this *MysqlConnection)GetColumns(dbName string,tableName string)*TableMete
 	tableMete.PkColumns = pkColumns
 	tableMete.PkColumnIndexes = pkColumnIndexes
 
+	putTableMateMap(key,tableMate)
 	return tableMete
 }
 

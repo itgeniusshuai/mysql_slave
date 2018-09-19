@@ -406,13 +406,14 @@ func (this *MysqlConnection)WriteBinLogDumpPacket() error{
 	// 开启binlog dump,监听binlog
 	this.SetMsgSeq(0)
 
-	data := make([]byte, 4+1+4+2+4+len(""))
+	posStatus := this.GetMasterStatus()
+	data := make([]byte, 4+1+4+2+4+len(posStatus.Name))
 
 	pos := 4
 	data[pos] = COM_BINLOG_DUMP
 	pos++
 
-	binary.LittleEndian.PutUint32(data[pos:], this.GetMasterStatus())
+	binary.LittleEndian.PutUint32(data[pos:], posStatus.Pos)
 	pos += 4
 
 	binary.LittleEndian.PutUint16(data[pos:], BINLOG_DUMP_NEVER_STOP)
@@ -421,7 +422,7 @@ func (this *MysqlConnection)WriteBinLogDumpPacket() error{
 	binary.LittleEndian.PutUint32(data[pos:], this.ServerId)
 	pos += 4
 
-	copy(data[pos:], "")
+	copy(data[pos:], posStatus.Name)
 
 	return this.WriteServerData(data)
 }
