@@ -4,16 +4,16 @@ import (
 	"github.com/itgeniusshuai/mysql_slave/slave"
 	"fmt"
 	"github.com/itgeniusshuai/mysql_slave/tools"
-	"github.com/itgeniusshuai/mysql_slave/controllers"
 )
 
 var Semaphore = make(chan int,1)
 
 func main(){
 	//mainFunc("127.0.0.1",3306,"root","",1)
+	mainFunc("172.18.98.12",3306,"db2","EEB9703F3F",1)
 
 	// web
-	controllers.InitWeb()
+	//controllers.InitWeb()
 	select{
 	case <-Semaphore:
 		fmt.Println("exit")

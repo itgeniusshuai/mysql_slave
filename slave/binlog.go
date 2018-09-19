@@ -22,8 +22,8 @@ import (
 
 var tableMap = make(map[int]TableMapBinlogEvent,0)
 var tableMapLock = sync.Mutex{}
-var tableMateMap = make(map[string]TableMete,0)
-var tableMateMapLock = sync.Mutex{}
+var tableMeteMap = make(map[string]*TableMete,0)
+var tableMeteMapLock = sync.Mutex{}
 var connFormat = make(map[string]byte,0)
 var formatDescLock = sync.Mutex{}
 
@@ -51,16 +51,16 @@ func getTableMap(tableId int)TableMapBinlogEvent{
 	return tableMap[tableId]
 }
 
-func putTableMateMap(key string, tableMate TableMete){
-	defer tableMateMapLock.Unlock()
-	tableMateMapLock.Lock()
-	tableMateMap[key] = tableMate
+func putTableMateMap(key string, tableMete *TableMete){
+	defer tableMeteMapLock.Unlock()
+	tableMeteMapLock.Lock()
+	tableMeteMap[key] = tableMete
 }
 
-func getTableMateMap(key string)TableMete{
-	defer tableMateMapLock.Unlock()
-	tableMateMapLock.Lock()
-	return tableMateMap[key]
+func getTableMateMap(key string)*TableMete{
+	defer tableMeteMapLock.Unlock()
+	tableMeteMapLock.Lock()
+	return tableMeteMap[key]
 }
 
 func putConnFormatMap(connId string, checkNum byte){
@@ -254,9 +254,9 @@ func (this *MysqlConnection) GetConn()*sql.DB{
 
 func (this *MysqlConnection)GetColumns(dbName string,tableName string)*TableMete{
 	key := dbName+"_"+tableName
-	tableMate := getTableMateMap(key)
-	if &tableMate != nil{
-		return &tableMate
+	tableMete := getTableMateMap(key)
+	if tableMete != nil{
+		return tableMete
 	}
 	db := this.GetConn()
 	r, err := db.Query(fmt.Sprintf("show full columns from `%s`.`%s`", dbName,tableName))
@@ -302,13 +302,13 @@ func (this *MysqlConnection)GetColumns(dbName string,tableName string)*TableMete
 		}
 
 	}
-	tableMete := new(TableMete)
+	tableMete = new(TableMete)
 	tableMete.ColumnNames = columnNames
 	tableMete.ColumnTypes = columnTypes
 	tableMete.PkColumns = pkColumns
 	tableMete.PkColumnIndexes = pkColumnIndexes
 
-	putTableMateMap(key,tableMate)
+	putTableMateMap(key,tableMete)
 	return tableMete
 }
 
