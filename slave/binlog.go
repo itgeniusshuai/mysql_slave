@@ -119,11 +119,11 @@ type BinlogHeader struct{
 	Flags []byte
 	ExtraHeaders []byte
 
-	Id int
+	Id int64
 }
 
 // 解析事件头每个事件都一样
-func ParseBinlogHeader(bs []byte) *BinlogHeader{
+func ParseBinlogHeader(bs []byte, conn *MysqlConnection) *BinlogHeader{
 	size := 19 + 4 + 1
 	if len(bs) < size{
 		fmt.Println("size is %d",len(bs))
@@ -145,7 +145,19 @@ func ParseBinlogHeader(bs []byte) *BinlogHeader{
 		return nil
 	}
 	// 封装id，不同连接的一个消息要相同，并且有递增顺序 bs[3]就是递增序号
-	binlogHeader.Id = (binlogHeader.TimeStamp << 8) | int(bs[3])
+	var curSeq = int(bs[3])
+	currentTimeStamp := binlogHeader.TimeStamp
+	if currentTimeStamp != conn.LastTimeStamp {
+		conn.MulFactor = 0
+	}else if conn.LastSeq == 255 {
+		conn.MulFactor ++
+	}
+	// 每个连接不共享的三个变量，用于生成每个事件的ID
+	conn.LastSeq = curSeq
+	conn.LastTimeStamp = currentTimeStamp
+	binlogHeader.Id = (int64(currentTimeStamp) << 32) | (int64(curSeq)+256*conn.MulFactor)
+	fmt.Println(fmt.Sprintf("timepstamp[%d]seq[%d]finalSeq[%d]",binlogHeader.TimeStamp,int(curSeq),(int64(curSeq)+255*conn.MulFactor)))
+	fmt.Println(fmt.Sprintf("id[%d]",binlogHeader.Id))
 	return &binlogHeader
 }
 
@@ -153,7 +165,7 @@ func ParseBinlogHeader(bs []byte) *BinlogHeader{
 func ParseEvent(bs []byte,conn *MysqlConnection) *BinlogEventStruct{
 	//tools.Println("received event %s",common.BytesToStr(bs))
 	binlogEventStruct := BinlogEventStruct{}
-	header := ParseBinlogHeader(bs)
+	header := ParseBinlogHeader(bs,conn)
 	if header == nil{
 		return nil
 	}

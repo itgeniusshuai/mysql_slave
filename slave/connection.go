@@ -33,6 +33,11 @@ type MysqlConnection struct{
 	// 连接唯一标示
 	id string
 	Db *sql.DB
+
+	// 事件唯一标识
+	LastTimeStamp int
+	LastSeq int
+	MulFactor int64
 }
 
 var buffer []byte = make([]byte,1024)

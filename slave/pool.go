@@ -23,7 +23,7 @@ type Pool struct {
 	// 事件处理函数
 	DealFunc func(eventStruct BinlogEventStruct)
 	// 上次处理事件时间戳
-	LastEventId int
+	LastEventId int64
 
 }
 
