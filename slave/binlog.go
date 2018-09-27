@@ -163,7 +163,7 @@ func ParseBinlogHeader(bs []byte, conn *MysqlConnection) *BinlogHeader{
 }
 
 // 解析事件（包含头和体）
-func ParseEvent(bs []byte,conn *MysqlConnection) (*BinlogEventStruct,error){
+func ParseEvent(bs []byte,conn *MysqlConnection) *BinlogEventStruct{
 	var err error
 	defer func() {
 		if r := recover(); r != nil {
@@ -180,7 +180,7 @@ func ParseEvent(bs []byte,conn *MysqlConnection) (*BinlogEventStruct,error){
 	binlogEventStruct := BinlogEventStruct{}
 	header := ParseBinlogHeader(bs,conn)
 	if header == nil{
-		return nil,err
+		return nil
 	}
 	binlogEventStruct.BinlogHeader = *header
 	var binlogEvent BinlogEvent
@@ -198,14 +198,14 @@ func ParseEvent(bs []byte,conn *MysqlConnection) (*BinlogEventStruct,error){
 		// 第一个binlog事件
 		binlogEvent = &FormatDescEvent{}
 	default:
-		return nil,err
+		return nil
 	}
 	flag := binlogEvent.ParseEvent(bs)
 	if(!flag){
-		return nil,err
+		return nil
 	}
 	binlogEventStruct.BinlogEvent = binlogEvent
-	return &binlogEventStruct,err
+	return &binlogEventStruct
 }
 
 // 具体事件的解析实现
