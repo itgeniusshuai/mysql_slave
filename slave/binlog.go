@@ -18,6 +18,7 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 	"database/sql"
 	"log"
+	"runtime"
 )
 
 var tableMap = make(map[int]TableMapBinlogEvent,0)
@@ -162,12 +163,24 @@ func ParseBinlogHeader(bs []byte, conn *MysqlConnection) *BinlogHeader{
 }
 
 // 解析事件（包含头和体）
-func ParseEvent(bs []byte,conn *MysqlConnection) *BinlogEventStruct{
+func ParseEvent(bs []byte,conn *MysqlConnection) (*BinlogEventStruct,error){
+	var err error
+	defer func() {
+		if r := recover(); r != nil {
+			err = r.(error)
+			if r, ok := r.(runtime.Error); ok {
+				err = errors.New(r.Error())
+			}
+			if s, ok := r.(string); ok {
+				err =  errors.New(s)
+			}
+		}
+	}()
 	//tools.Println("received event %s",common.BytesToStr(bs))
 	binlogEventStruct := BinlogEventStruct{}
 	header := ParseBinlogHeader(bs,conn)
 	if header == nil{
-		return nil
+		return nil,err
 	}
 	binlogEventStruct.BinlogHeader = *header
 	var binlogEvent BinlogEvent
@@ -185,14 +198,14 @@ func ParseEvent(bs []byte,conn *MysqlConnection) *BinlogEventStruct{
 		// 第一个binlog事件
 		binlogEvent = &FormatDescEvent{}
 	default:
-		return nil
+		return nil,err
 	}
 	flag := binlogEvent.ParseEvent(bs)
 	if(!flag){
-		return nil
+		return nil,err
 	}
 	binlogEventStruct.BinlogEvent = binlogEvent
-	return &binlogEventStruct
+	return &binlogEventStruct,err
 }
 
 // 具体事件的解析实现
