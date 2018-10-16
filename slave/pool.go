@@ -69,7 +69,9 @@ func (this *Pool)CheckPoolConn(){
 	for _ = range tick.C {
 		var now= time.Now().Second()
 		for i, conn := range this.Conns {
+			tools.Println("check pool conn every second")
 			if conn.LastReceivedTime.Second()+10 < now {
+				tools.Println("conn"+conn.id+" has interrupt")
 				conn.Close()
 				conn = GetMysqlConnection(this.Host, this.Port, this.User, this.Pwd, this.ServerId)
 				this.Conns[i] = conn
