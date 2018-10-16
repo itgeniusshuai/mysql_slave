@@ -59,7 +59,7 @@ func (this *Pool)ListenBinlogAndParse( dealEvent func(v BinlogEventStruct)){
 		conn.StartBinlogDumpAndListen(dealPoolEvent)
 	}
 	// 开启池连接检测
-	//go this.CheckPoolConn()
+	go this.CheckPoolConn()
 }
 
 // 检测池连接并断了重新连接
@@ -73,6 +73,7 @@ func (this *Pool)CheckPoolConn(){
 				conn.Close()
 				conn = GetMysqlConnection(this.Host, this.Port, this.User, this.Pwd, this.ServerId)
 				this.Conns[i] = conn
+				tools.Println("reconnect to  mysql")
 				conn.StartBinlogDumpAndListen(this.DealFunc)
 			}
 		}
