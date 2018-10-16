@@ -269,12 +269,14 @@ func (this *MysqlConnection) GetMasterStatus()*Position{
 }
 
 func (this *MysqlConnection) GetConn()*sql.DB{
-	if(this.Db == nil){
+	var db *sql.DB
+	//if(this.Db == nil){
 		dateSourceName := this.User+":"+this.Pwd+"@tcp("+this.Host+":"+common.IntToStr(this.Port)+")/"
-		db,_ :=sql.Open("mysql", dateSourceName)
-		this.Db = db
-	}
-	return this.Db
+		db,_ =sql.Open("mysql", dateSourceName)
+		//this.Db = db
+		return db;
+	//}
+	//return db
 }
 
 func (this *MysqlConnection)GetColumns(dbName string,tableName string)*TableMete{
@@ -284,6 +286,7 @@ func (this *MysqlConnection)GetColumns(dbName string,tableName string)*TableMete
 		return tableMete
 	}
 	db := this.GetConn()
+	defer db.Close()
 	r, err := db.Query(fmt.Sprintf("show full columns from `%s`.`%s`", dbName,tableName))
 	if(err != nil){
 		fmt.Print(err)

@@ -490,6 +490,8 @@ func (this *MysqlConnection)Close(){
 			fmt.Println("Recovered Close Conn:", r)
 		}
 	}()
+	//this.Db.Close()
+	fmt.Println("colse conn")
 	this.Conn.Close()
 }
 
