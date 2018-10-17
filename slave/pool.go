@@ -96,6 +96,13 @@ func (this *Pool)check() error{
 	for i, conn := range this.Conns {
 		tools.Println("check pool conn every conn")
 		if conn.LastReceivedTime.Second()+10 < now || conn == nil{
+			var bs = []byte{1}
+			_,err := conn.Conn.Write(bs)
+			if err == nil{
+				// if can write conn can use
+				tools.Println("conn can use")
+				continue
+			}
 			tools.Println("conn"+conn.id+" has interrupt")
 			if conn != nil{
 				conn.Close()
