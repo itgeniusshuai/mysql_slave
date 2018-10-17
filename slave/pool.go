@@ -3,6 +3,9 @@ package slave
 import (
 	"github.com/itgeniusshuai/mysql_slave/tools"
 	"time"
+	"fmt"
+	"runtime"
+	"errors"
 )
 
 type Pool struct {
@@ -64,20 +67,44 @@ func (this *Pool)ListenBinlogAndParse( dealEvent func(v BinlogEventStruct)){
 
 // 检测池连接并断了重新连接
 func (this *Pool)CheckPoolConn(){
-	tools.Println("check pool conn every second")
+	tools.Println("start check pool conn every second")
 	tick := time.NewTicker(1*time.Second)
 	for _ = range tick.C {
-		var now= time.Now().Second()
-		for i, conn := range this.Conns {
-			tools.Println("check pool conn every second")
-			if conn.LastReceivedTime.Second()+10 < now {
-				tools.Println("conn"+conn.id+" has interrupt")
-				conn.Close()
-				conn = GetMysqlConnection(this.Host, this.Port, this.User, this.Pwd, this.ServerId)
-				this.Conns[i] = conn
-				tools.Println("reconnect to  mysql")
-				conn.StartBinlogDumpAndListen(this.DealFunc)
-			}
+		tools.Println("checking pool conn every second")
+		err := this.check()
+		if err != nil{
+			fmt.Println("check pool error ",err.Error())
 		}
 	}
+}
+
+func (this *Pool)check() error{
+	var err error
+	defer func() {
+		if r := recover(); r != nil {
+			err = r.(error)
+			if r, ok := r.(runtime.Error); ok {
+				err = errors.New(r.Error())
+			}
+			if s, ok := r.(string); ok {
+				err =  errors.New(s)
+			}
+		}
+	}()
+	var now= time.Now().Second()
+	fmt.Println(fmt.Sprintf("this conns [%v]",this.Conns))
+	for i, conn := range this.Conns {
+		tools.Println("check pool conn every conn")
+		if conn.LastReceivedTime.Second()+10 < now || conn == nil{
+			tools.Println("conn"+conn.id+" has interrupt")
+			if conn != nil{
+				conn.Close()
+			}
+			conn = GetMysqlConnection(this.Host, this.Port, this.User, this.Pwd, this.ServerId)
+			this.Conns[i] = conn
+			tools.Println("reconnect to  mysql")
+			conn.StartBinlogDumpAndListen(this.DealFunc)
+		}
+	}
+	return nil
 }
