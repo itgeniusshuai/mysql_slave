@@ -38,6 +38,9 @@ type MysqlConnection struct{
 	LastTimeStamp int
 	LastSeq int
 	MulFactor int64
+
+	Bs []byte
+	ByteBuff bytes.Buffer
 }
 
 var buffer []byte = make([]byte,1024)
@@ -79,8 +82,8 @@ func (this *MysqlConnection)ConnectMysql() error{
 // 00 00 00 02
 // 直到小于0xfffff
 func (this *MysqlConnection)ReadServerData()([]byte,error){
-	var bs []byte
-	var byteBuff bytes.Buffer
+	var bs = this.Bs
+	var byteBuff = this.ByteBuff
 	n,err := io.ReadFull(this.Conn,sizeBuffer)
 	if n == 0{
 		return bs,nil
@@ -99,6 +102,7 @@ func (this *MysqlConnection)ReadServerData()([]byte,error){
 	this.SetMsgSeq(bs[3]+1)
 
 	if(pkLen == 0xfffff){
+		fmt.Println("more than one packet")
 		bs1,_ := this.ReadServerData()
 		if(bs1 != nil && len(bs1)>0){
 			bs = append(bs, bs1[1:]...)
