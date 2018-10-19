@@ -78,8 +78,7 @@ func (this *Pool)CheckPoolConn(){
 	}
 }
 
-func (this *Pool)check() error{
-	var err error
+func (this *Pool)check() (err error){
 	defer func() {
 		if r := recover(); r != nil {
 			err = r.(error)
