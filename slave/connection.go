@@ -82,8 +82,8 @@ func (this *MysqlConnection)ConnectMysql() error{
 // 00 00 00 02
 // 直到小于0xfffff
 func (this *MysqlConnection)ReadServerData()([]byte,error){
-	var bs = this.Bs
-	var byteBuff = this.ByteBuff
+	var bs []byte
+	var byteBuff bytes.Buffer
 	n,err := io.ReadFull(this.Conn,sizeBuffer)
 	if n == 0{
 		return bs,nil
