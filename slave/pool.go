@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"runtime"
 	"errors"
+	"net"
 )
 
 type Pool struct {
@@ -96,7 +97,7 @@ func (this *Pool)check() (err error){
 		tools.Println("check pool conn every conn")
 		if conn.LastReceivedTime.Second()+10 < now || conn == nil{
 			var bs = []byte{1}
-			_,err := conn.Conn.Write(bs)
+			err := write(conn.Conn,bs)
 			if err == nil{
 				// if can write conn can use
 				tools.Println("conn can use")
@@ -114,3 +115,22 @@ func (this *Pool)check() (err error){
 	}
 	return nil
 }
+
+func write(conn net.Conn,bs []byte)(err error){
+	defer func() {
+		if r := recover(); r != nil {
+			err = r.(error)
+			if r, ok := r.(runtime.Error); ok {
+				err = errors.New(r.Error())
+			}
+			if s, ok := r.(string); ok {
+				err =  errors.New(s)
+			}
+		}
+		err = errors.New("write failed")
+	}()
+	_,err = conn.Write(bs)
+	return err;
+
+}
+
