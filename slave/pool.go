@@ -81,6 +81,7 @@ func (this *Pool)CheckPoolConn(){
 
 func (this *Pool)check() (err error){
 	defer func() {
+		fmt.Println("check after error")
 		if r := recover(); r != nil {
 			err = r.(error)
 			if r, ok := r.(runtime.Error); ok {
@@ -90,13 +91,17 @@ func (this *Pool)check() (err error){
 				err =  errors.New(s)
 			}
 		}
+		err =  errors.New("check error")
 	}()
 	var now= time.Now().Second()
 	fmt.Println(fmt.Sprintf("this conns [%v]",this.Conns))
 	for i, conn := range this.Conns {
+		fmt.Println(fmt.Sprintf("this conns [%v]",conn))
 		tools.Println("check pool conn every conn")
 		if conn.LastReceivedTime.Second()+10 < now || conn == nil{
+			tools.Println("check pool could be unused")
 			var bs = []byte{1}
+			tools.Println("write a byte on this conn")
 			err := write(conn.Conn,bs)
 			if err == nil{
 				// if can write conn can use
@@ -118,6 +123,7 @@ func (this *Pool)check() (err error){
 
 func write(conn net.Conn,bs []byte)(err error){
 	defer func() {
+		fmt.Println("after write err")
 		if r := recover(); r != nil {
 			err = r.(error)
 			if r, ok := r.(runtime.Error); ok {
