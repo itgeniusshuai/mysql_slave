@@ -97,22 +97,26 @@ func (this *Pool)check() (err error){
 	fmt.Println(fmt.Sprintf("this conns [%v]",this.Conns))
 	for i, conn := range this.Conns {
 		fmt.Println(fmt.Sprintf("this conns [%v]",conn))
-		tools.Println("check pool conn every conn")
-		if conn.LastReceivedTime.Second()+10 < now || conn == nil{
+		tools.Println("check pool conn every conn one")
+		if conn == nil || conn.LastReceivedTime == nil || conn.LastReceivedTime.Second()+10 < now {
 			tools.Println("check pool could be unused")
-			var bs = []byte{1}
-			tools.Println("write a byte on this conn")
-			err := write(conn.Conn,bs)
-			if err == nil{
-				// if can write conn can use
-				tools.Println("conn can use")
-				continue
+			if conn != nil{
+				var bs = []byte{1}
+				tools.Println("write a byte on this conn")
+				err := write(conn.Conn,bs)
+				if err == nil{
+					// if can write conn can use
+					tools.Println("conn can use")
+					continue
+				}
 			}
 			tools.Println("conn"+conn.id+" has interrupt")
 			if conn != nil{
 				conn.Close()
 			}
 			conn = GetMysqlConnection(this.Host, this.Port, this.User, this.Pwd, this.ServerId)
+			var now = time.Now()
+			conn.LastReceivedTime = &now
 			this.Conns[i] = conn
 			tools.Println("reconnect to  mysql")
 			conn.StartBinlogDumpAndListen(this.DealFunc)

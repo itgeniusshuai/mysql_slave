@@ -29,7 +29,7 @@ type MysqlConnection struct{
 	ServerId uint32
 
 	// 用于检测
-	LastReceivedTime time.Time
+	LastReceivedTime *time.Time
 	// 连接唯一标示
 	id string
 	Db *sql.DB
@@ -311,7 +311,8 @@ func (this *MysqlConnection)ListenBinlog(){
 		if bs[4] != 0{
 			continue
 		}
-		this.LastReceivedTime = time.Now()
+		var now = time.Now()
+		this.LastReceivedTime = &now
 		tools.Println("parse []byte to BinlogEvent")
 		binlogEvent := ParseEvent(bs,this)
 		if binlogEvent == nil{
