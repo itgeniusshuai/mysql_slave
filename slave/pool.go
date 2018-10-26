@@ -3,7 +3,6 @@ package slave
 import (
 	"github.com/itgeniusshuai/mysql_slave/tools"
 	"time"
-	"fmt"
 	"runtime"
 	"errors"
 	"net"
