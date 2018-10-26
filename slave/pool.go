@@ -68,20 +68,20 @@ func (this *Pool)ListenBinlogAndParse( dealEvent func(v BinlogEventStruct)){
 
 // 检测池连接并断了重新连接
 func (this *Pool)CheckPoolConn(){
-	tools.Println("start check pool conn every second")
+	//tools.Println("start check pool conn every second")
 	tick := time.NewTicker(1*time.Second)
 	for _ = range tick.C {
-		tools.Println("checking pool conn every second")
+		//tools.Println("checking pool conn every second")
 		err := this.check()
 		if err != nil{
-			fmt.Println("check pool error ",err.Error())
+			//fmt.Println("check pool error ",err.Error())
 		}
 	}
 }
 
 func (this *Pool)check() (err error){
 	defer func() {
-		fmt.Println("check after error")
+		//fmt.Println("check after error")
 		if r := recover(); r != nil {
 			err = r.(error)
 			if r, ok := r.(runtime.Error); ok {
@@ -94,23 +94,23 @@ func (this *Pool)check() (err error){
 		err =  errors.New("check error")
 	}()
 	var now= time.Now().Second()
-	fmt.Println(fmt.Sprintf("this conns [%v]",this.Conns))
+	//fmt.Println(fmt.Sprintf("this conns [%v]",this.Conns))
 	for i, conn := range this.Conns {
-		fmt.Println(fmt.Sprintf("this conns [%v]",conn))
-		tools.Println("check pool conn every conn one")
+		//fmt.Println(fmt.Sprintf("this conns [%v]",conn))
+		//tools.Println("check pool conn every conn one")
 		if conn == nil || conn.LastReceivedTime == nil || conn.LastReceivedTime.Second()+10 < now {
-			tools.Println("check pool could be unused")
+			//tools.Println("check pool could be unused")
 			if conn != nil{
 				var bs = []byte{1}
-				tools.Println("write a byte on this conn")
+				//tools.Println("write a byte on this conn")
 				err := write(conn.Conn,bs)
 				if err == nil{
 					// if can write conn can use
-					tools.Println("conn can use")
+					//tools.Println("conn can use")
 					continue
 				}
 			}
-			tools.Println("conn"+conn.id+" has interrupt")
+			//tools.Println("conn"+conn.id+" has interrupt")
 			if conn != nil{
 				conn.Close()
 			}
@@ -127,7 +127,7 @@ func (this *Pool)check() (err error){
 
 func write(conn net.Conn,bs []byte)(err error){
 	defer func() {
-		fmt.Println("after write err")
+		//fmt.Println("after write err")
 		if r := recover(); r != nil {
 			err = r.(error)
 			if r, ok := r.(runtime.Error); ok {

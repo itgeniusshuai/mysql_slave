@@ -27,6 +27,7 @@ var tableMeteMap = make(map[string]*TableMete,0)
 var tableMeteMapLock = sync.Mutex{}
 var connFormat = make(map[string]byte,0)
 var formatDescLock = sync.Mutex{}
+var db *sql.DB
 
 type TableMete struct {
 	ColumnNames []string
@@ -269,14 +270,13 @@ func (this *MysqlConnection) GetMasterStatus()*Position{
 }
 
 func (this *MysqlConnection) GetConn()*sql.DB{
-	var db *sql.DB
-	//if(this.Db == nil){
+	if db == nil {
 		dateSourceName := this.User+":"+this.Pwd+"@tcp("+this.Host+":"+common.IntToStr(this.Port)+")/"
 		db,_ =sql.Open("mysql", dateSourceName)
 		//this.Db = db
 		return db;
-	//}
-	//return db
+	}
+	return db
 }
 
 func (this *MysqlConnection)GetColumns(dbName string,tableName string)*TableMete{

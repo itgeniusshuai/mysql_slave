@@ -286,7 +286,7 @@ func (this *MysqlConnection) StartBinlogDumpAndListen(dealBinlogFunc func(binlog
 		for {
 			select {
 			case v := <-BinlogChan:
-				tools.Println("type code [%d] conn id [%s] header pos",v.BinlogHeader.TypeCode,this.id,v.BinlogHeader.TimeStamp)
+				//tools.Println("type code [%d] conn id [%s] header pos",v.BinlogHeader.TypeCode,this.id,v.BinlogHeader.TimeStamp)
 				dealBinlogFunc(v)
 			}
 		}
@@ -313,13 +313,13 @@ func (this *MysqlConnection)ListenBinlog(){
 		}
 		var now = time.Now()
 		this.LastReceivedTime = &now
-		tools.Println("parse []byte to BinlogEvent")
+		//tools.Println("parse []byte to BinlogEvent")
 		binlogEvent := ParseEvent(bs,this)
 		if binlogEvent == nil{
-			tools.Println("parse nothing don't send to chan")
+			//tools.Println("parse nothing don't send to chan")
 			continue
 		}
-		tools.Println("send BinlogEvent to chan")
+		//tools.Println("send BinlogEvent to chan")
 		BinlogChan <- *binlogEvent
 	}
 }
