@@ -6,6 +6,7 @@ import (
 	"runtime"
 	"errors"
 	"net"
+	"fmt"
 )
 
 type Pool struct {
@@ -47,7 +48,6 @@ func MakePool(poolSize uint8,host string,port int,user string,pwd string,serverI
 
 // 监听binlog
 func (this *Pool)ListenBinlogAndParse( dealEvent func(v BinlogEventStruct)){
-	this.DealFunc = dealEvent
 	// 过滤重复事件
 	var dealPoolEvent = func(v BinlogEventStruct){
 		currEventId := v.BinlogHeader.Id
@@ -58,6 +58,7 @@ func (this *Pool)ListenBinlogAndParse( dealEvent func(v BinlogEventStruct)){
 			tools.Println("event has been dealed by other conn")
 		}
 	}
+	this.DealFunc = dealPoolEvent
 	for _,conn := range this.Conns{
 		conn.StartBinlogDumpAndListen(dealPoolEvent)
 	}
@@ -93,7 +94,7 @@ func (this *Pool)check() (err error){
 		err =  errors.New("check error")
 	}()
 	var now= time.Now().Second()
-	//fmt.Println(fmt.Sprintf("this conns [%v]",this.Conns))
+	fmt.Println(fmt.Sprintf("this conns [%v]",this.Conns))
 	for i, conn := range this.Conns {
 		//fmt.Println(fmt.Sprintf("this conns [%v]",conn))
 		//tools.Println("check pool conn every conn one")
@@ -113,12 +114,12 @@ func (this *Pool)check() (err error){
 			if conn != nil{
 				conn.Close()
 			}
-			conn = GetMysqlConnection(this.Host, this.Port, this.User, this.Pwd, this.ServerId)
+			newConn := GetMysqlConnection(this.Host, this.Port, this.User, this.Pwd, this.ServerId)
 			var now = time.Now()
 			conn.LastReceivedTime = &now
-			this.Conns[i] = conn
+			this.Conns[i] = newConn
 			tools.Println("reconnect to  mysql")
-			conn.StartBinlogDumpAndListen(this.DealFunc)
+			newConn.StartBinlogDumpAndListen(this.DealFunc)
 		}
 	}
 	return nil
