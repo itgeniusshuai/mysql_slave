@@ -334,7 +334,7 @@ func (this *MysqlConnection)RegisterSlave() error{
 	}
 	// 心跳周期2s
 	tools.Println("set heartbeat period")
-	this.Execute(`SET @master_heartbeat_period=2;`)
+	//this.Execute(`SET @master_heartbeat_period=2;`)
 	if (e != nil){
 		return e
 	}

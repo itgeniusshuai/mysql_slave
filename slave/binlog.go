@@ -158,8 +158,8 @@ func ParseBinlogHeader(bs []byte, conn *MysqlConnection) *BinlogHeader{
 	conn.LastSeq = curSeq
 	conn.LastTimeStamp = currentTimeStamp
 	binlogHeader.Id = (int64(currentTimeStamp) << 32) | (int64(curSeq)+256*conn.MulFactor)
-	//fmt.Println(fmt.Sprintf("timepstamp[%d]seq[%d]finalSeq[%d]",binlogHeader.TimeStamp,int(curSeq),(int64(curSeq)+255*conn.MulFactor)))
-	//fmt.Println(fmt.Sprintf("id[%d]",binlogHeader.Id))
+	fmt.Println(fmt.Sprintf("timepstamp[%d]seq[%d]finalSeq[%d]",binlogHeader.TimeStamp,int(curSeq),(int64(curSeq)+255*conn.MulFactor)))
+	fmt.Println(fmt.Sprintf("id[%d]",binlogHeader.Id))
 	return &binlogHeader
 }
 
