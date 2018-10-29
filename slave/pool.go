@@ -103,8 +103,8 @@ func (this *Pool)check() (err error){
 			if conn != nil{
 				var bs = []byte{1}
 				//tools.Println("write a byte on this conn")
-				err := write(conn.Conn,bs)
-				if err == nil{
+				err1 := write(conn.Conn,bs)
+				if err1 == nil{
 					// if can write conn can use
 					//tools.Println("conn can use")
 					continue
@@ -136,8 +136,8 @@ func write(conn net.Conn,bs []byte)(err error){
 			if s, ok := r.(string); ok {
 				err =  errors.New(s)
 			}
+			err = errors.New("write failed")
 		}
-		err = errors.New("write failed")
 	}()
 	_,err = conn.Write(bs)
 	return err;

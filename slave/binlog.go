@@ -270,12 +270,14 @@ func (this *MysqlConnection) GetMasterStatus()*Position{
 }
 
 func (this *MysqlConnection) GetConn()*sql.DB{
-	if db == nil {
+
+	if (db == nil) || db.Ping() != nil{
 		dateSourceName := this.User+":"+this.Pwd+"@tcp("+this.Host+":"+common.IntToStr(this.Port)+")/"
 		db,_ =sql.Open("mysql", dateSourceName)
 		//this.Db = db
 		return db;
 	}
+
 	return db
 }
 
