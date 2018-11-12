@@ -284,9 +284,9 @@ func (this *MysqlConnection) GetConn()*sql.DB{
 func (this *MysqlConnection)GetColumns(dbName string,tableName string)*TableMete{
 	key := dbName+"_"+tableName
 	tableMete := getTableMateMap(key)
-	if tableMete != nil{
-		return tableMete
-	}
+	//if tableMete != nil{
+	//	return tableMete
+	//}
 	db := this.GetConn()
 	defer db.Close()
 	r, err := db.Query(fmt.Sprintf("show full columns from `%s`.`%s`", dbName,tableName))
