@@ -41,6 +41,9 @@ type MysqlConnection struct{
 
 	Bs []byte
 	ByteBuff bytes.Buffer
+
+	// 过滤日志函数
+	FilterFunc func(dbName string, tableName string)bool `json:"-"`
 }
 
 var buffer []byte = make([]byte,1024)
@@ -318,6 +321,16 @@ func (this *MysqlConnection)ListenBinlog(){
 		if binlogEvent == nil{
 			//tools.Println("parse nothing don't send to chan")
 			continue
+		}
+		event := binlogEvent.BinlogEvent
+		switch v := event.(type) {
+		case *RowBinlogEvent:
+			if this.FilterFunc!=nil && !this.FilterFunc(v.DbName,v.TableName){
+				continue
+			}
+		default:
+
+
 		}
 		//tools.Println("send BinlogEvent to chan")
 		BinlogChan <- *binlogEvent

@@ -25,14 +25,14 @@ type Pool struct {
 	// 主机id
 	ServerId uint32
 	// 事件处理函数
-	DealFunc func(eventStruct BinlogEventStruct)
+	DealFunc func(eventStruct BinlogEventStruct) `json:"-"`
 	// 上次处理事件时间戳
 	LastEventId int64
 
 }
 
 // 获取连接池
-func MakePool(poolSize uint8,host string,port int,user string,pwd string,serverId uint32)Pool{
+func MakePool(poolSize uint8,host string,port int,user string,pwd string,serverId uint32,filterFunc func(dbName string, tableName string)bool)Pool{
 	if poolSize == 0 {
 		poolSize = DEFAULT_POOL_SIZE
 	}
@@ -41,6 +41,7 @@ func MakePool(poolSize uint8,host string,port int,user string,pwd string,serverI
 	var i uint8 = 0
 	for ;i < poolSize;i++{
 		conn := GetMysqlConnection(host,port,user,pwd,serverId)
+		conn.FilterFunc = filterFunc
 		pool.Conns = append(pool.Conns, conn)
 	}
 	return pool
@@ -48,6 +49,7 @@ func MakePool(poolSize uint8,host string,port int,user string,pwd string,serverI
 
 // 监听binlog
 func (this *Pool)ListenBinlogAndParse( dealEvent func(v BinlogEventStruct)){
+	// 过滤binlog
 	// 过滤重复事件
 	var dealPoolEvent = func(v BinlogEventStruct){
 		currEventId := v.BinlogHeader.Id
