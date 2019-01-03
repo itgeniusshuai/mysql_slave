@@ -6,7 +6,6 @@ import (
 	"runtime"
 	"errors"
 	"net"
-	"fmt"
 )
 
 type Pool struct {
