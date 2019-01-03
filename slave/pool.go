@@ -96,7 +96,7 @@ func (this *Pool)check() (err error){
 		err =  errors.New("check error")
 	}()
 	var now= time.Now().Second()
-	fmt.Println(fmt.Sprintf("this conns [%v]",this.Conns))
+	//fmt.Println(fmt.Sprintf("this conns [%v]",this.Conns))
 	for i, conn := range this.Conns {
 		//fmt.Println(fmt.Sprintf("this conns [%v]",conn))
 		//tools.Println("check pool conn every conn one")
