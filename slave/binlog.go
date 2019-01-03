@@ -232,6 +232,10 @@ func (this *RowBinlogEvent) ParseEvent(bs []byte) bool{
 	tableMapEvent := getTableMap(this.TableId)
 	this.DbName = tableMapEvent.DbName
 	this.TableName = tableMapEvent.TableName
+	// 过滤
+	if (this.Conn.FilterFunc != nil && !this.Conn.FilterFunc(this.DbName,this.TableName)){
+		return false
+	}
 	if getConnFormatMap(this.ConnId) == BINLOG_CHECKSUM_ALG_CRC32{
 		bs = bs[:len(bs)-4]
 	}
@@ -245,7 +249,7 @@ func (this *RowBinlogEvent) ParseEvent(bs []byte) bool{
 		}
 	}
 
-	// 获取表字段
+
 	this.TableMete = this.Conn.GetColumns(this.DbName,this.TableName)
 	return true;
 
