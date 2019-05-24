@@ -109,6 +109,7 @@ type RowBinlogEvent struct {
 	ConnId string
 	EventType EventType
 	Conn *MysqlConnection
+	Version int
 }
 
 // 事件头
@@ -185,14 +186,15 @@ func ParseEvent(bs []byte,conn *MysqlConnection) *BinlogEventStruct{
 	}
 	binlogEventStruct.BinlogHeader = *header
 	var binlogEvent BinlogEvent
+	version := getRowBinlogVersion(header.TypeCode)
 	// 只解析增删改查的行事件
 	switch header.TypeCode {
 	case WRITE_ROWS_EVENT,WRITE_ROWS_EVENT_V1:
-		binlogEvent = &RowBinlogEvent{TypeCode:header.TypeCode,EventType:BINLOG_WRITE,Conn:conn}
+		binlogEvent = &RowBinlogEvent{TypeCode:header.TypeCode,EventType:BINLOG_WRITE,Conn:conn,Version:version}
 	case UPDATE_ROWS_EVENT,UPDATE_ROWS_EVENT_V1:
-		binlogEvent = &RowBinlogEvent{TypeCode:header.TypeCode,EventType:BINLOG_UPDATE,Conn:conn}
+		binlogEvent = &RowBinlogEvent{TypeCode:header.TypeCode,EventType:BINLOG_UPDATE,Conn:conn,Version:version}
 	case DELETE_ROWS_EVENT,DELETE_ROWS_EVENT_V1:
-		binlogEvent = &RowBinlogEvent{TypeCode:header.TypeCode,EventType:BINLOG_DELETE,Conn:conn}
+		binlogEvent = &RowBinlogEvent{TypeCode:header.TypeCode,EventType:BINLOG_DELETE,Conn:conn,Version:version}
 	case TABLE_MAP_EVENT:
 		binlogEvent = &TableMapBinlogEvent{}
 	case FORMAT_DESCRIPTION_EVENT:
@@ -209,11 +211,29 @@ func ParseEvent(bs []byte,conn *MysqlConnection) *BinlogEventStruct{
 	return &binlogEventStruct
 }
 
+func getRowBinlogVersion(typeCode byte)int{
+	version := 0
+	switch typeCode {
+	case WRITE_ROWS_EVENT_V1,UPDATE_ROWS_EVENT_V1,DELETE_ROWS_EVENT_V1:
+		version =  1;
+	case WRITE_ROWS_EVENT,UPDATE_ROWS_EVENT,DELETE_ROWS_EVENT:
+		version = 2;
+	default:
+		version =  1;
+	}
+	return version;
+
+}
+
 // 具体事件的解析实现
 func (this *RowBinlogEvent) ParseEvent(bs []byte) bool{
 	pos := 19 + 4 + 1
 	this.TableId = common.BytesToIntWithMin(bs[pos:pos+6])
-	pos += 6 + 2 // 2 bytes Reserved for future use.
+
+	pos += 6
+	if this.Version == 2{
+		pos += 2 // 2 bytes Reserved for future use.
+	}
 	this.FieldIsUsed = bs[pos:pos+2]
 	pos += 2
 	var n int
